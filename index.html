@@ -482,8 +482,10 @@ const CURVE = [
 ];
 
 const PULSE = [
-  { s: "SP:SPX",         n: "S&P 500",      dp: 2 },
-  { s: "NASDAQ:IXIC",    n: "Nasdaq Comp",  dp: 2 },
+  // The exchange-run index feeds (SP:SPX, NASDAQ:IXIC) are licensed and arrive delayed.
+  // These carry the identical series from a feed that is not, so they stream live.
+  { s: "SPCFD:SPX",      n: "S&P 500",      dp: 2 },
+  { s: "TVC:IXIC",       n: "Nasdaq Comp",  dp: 2 },
   { s: "TVC:DJI",        n: "Dow Jones",    dp: 2 },
   { s: "TVC:RUT",        n: "Russell 2000", dp: 2 },
   { s: "CME_MINI:ES1!",  n: "S&P Futures",  dp: 2 },
