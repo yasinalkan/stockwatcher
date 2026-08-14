@@ -127,6 +127,34 @@
   .tbtn span:first-child { display:inline-flex; color: var(--text-dim); }
   .tbtn span:last-child { font-family:var(--mono); font-size:11px; letter-spacing:.04em; min-width:32px; text-align:left; }
 
+  /* ---------- data-feed settings ---------- */
+  .cfgwrap { position:relative; }
+  .feed-dot { width:7px; height:7px; border-radius:50%; background: var(--text-mute); display:inline-block; }
+  .feed-dot.live { background: var(--up); animation: pulse 2.4s infinite; }
+  .feed-dot.connecting { background: var(--warn); animation: pulse 1s infinite; }
+  .feed-dot.error { background: var(--down); }
+  .cfg {
+    position:absolute; right:0; top:calc(100% + 8px);
+    width:310px; max-width: calc(100vw - 20px); z-index:40;
+    background: var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:13px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.32);
+  }
+  .cfg-h { font-size:12px; font-weight:650; margin-bottom:6px; }
+  .cfg-p { font-size:11px; color: var(--text-mute); line-height:1.5; margin:0 0 10px; }
+  .cfg-p a { color: var(--accent); }
+  .cfg-warn { margin:9px 0 0; }
+  .cfg-row { display:flex; gap:7px; }
+  .cfg-row input { flex:1; min-width:0; font-family:var(--mono); font-size:11.5px; }
+  .cfg-s { font-size:11px; margin-top:9px; font-family:var(--mono); }
+  .cfg-s.ok  { color: var(--up); }
+  .cfg-s.bad { color: var(--down); }
+  .cfg-s.wait{ color: var(--warn); }
+  .livetick { color: var(--up) !important; }
+  .livedot {
+    width:5px; height:5px; border-radius:50%; background: var(--up);
+    display:inline-block; margin-right:5px; vertical-align:middle;
+  }
+
   .chip-mkt { font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; padding:3px 8px; border-radius:5px; text-transform:uppercase; }
   .chip-mkt.open   { background: var(--up-bg);   color: var(--up); }
   .chip-mkt.closed { background: rgba(139,148,166,.12); color: var(--text-dim); }
@@ -287,6 +315,26 @@
     </select>
     <button id="now">Refresh now</button>
     <button id="theme" class="tbtn" aria-label="Switch theme"><span id="themeIcon"></span><span id="themeLbl"></span></button>
+    <div class="cfgwrap">
+      <button id="cfgBtn" class="tbtn" aria-expanded="false"><span id="cfgDot" class="feed-dot"></span><span id="cfgLbl">Delayed</span></button>
+      <div id="cfg" class="cfg" hidden>
+        <div class="cfg-h">Real-time prices</div>
+        <p class="cfg-p">
+          US equities arrive 15 minutes delayed without a data provider. Add a free
+          <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">Finnhub</a>
+          key to stream live prices for the watchlist, sector ETFs and stock cards.
+        </p>
+        <div class="cfg-row">
+          <input id="fhKey" type="password" placeholder="Finnhub API key" autocomplete="off" spellcheck="false">
+          <button id="fhSave">Save</button>
+        </div>
+        <div id="fhState" class="cfg-s"></div>
+        <p class="cfg-p cfg-warn">
+          Stored only in this browser's localStorage — never sent anywhere but Finnhub,
+          and never written into the page source.
+        </p>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -381,7 +429,9 @@
   <b>Data</b> — TradingView public scanner (no API key). Treasury yields, VIX, DXY, gold, silver and FX stream in real time;
   US equities, ETFs and index futures are delayed ~15 minutes; economic indicators update on their official release schedule.
   Breadth gauges (S5TW, S5FI, NDFI) are computed here from current index constituents rather than read from a published
-  index, so they may differ slightly from the official prints.<br>
+  index, so they may differ slightly from the official prints.
+  Adding a free Finnhub key under the feed menu replaces the delayed equity prices with a live stream; the key is held in
+  this browser only.<br>
   <b>Note</b> — This dashboard is an informational tool, not investment advice. Figures are sourced from a third-party public
   endpoint without any guarantee of accuracy; verify against an official source before acting on them.
 </footer>
@@ -488,7 +538,21 @@ const EXCHANGES = ["NASDAQ", "NYSE", "AMEX"]; // tried in order when resolving a
    STATE
    ══════════════════════════════════════════════════════════ */
 
-const LS = { wl: "sw.watchlist", iv: "sw.interval", sort: "sw.sort", perf: "sw.perf", theme: "sw.theme" };
+const LS = {
+  wl: "sw.watchlist", iv: "sw.interval", sort: "sw.sort",
+  perf: "sw.perf", theme: "sw.theme", fh: "sw.finnhubKey"
+};
+
+// Optional real-time overlay. The scanner's anonymous entitlement for US equities is
+// 15-minute delayed — a licensing limit, not a technical one — so live prices need a
+// provider the user has an account with. The key is entered at runtime and kept in
+// localStorage; it is deliberately never part of this file, which is public.
+const FH = {
+  rest: "https://finnhub.io/api/v1",
+  ws: "wss://ws.finnhub.io",
+  resnapshotMs: 5 * 60 * 1000, // realign previous-close and catch anything the socket missed
+  renderMs: 500                // trades arrive far faster than a repaint is worth
+};
 
 // Icons for the theme button, in cycle order.
 const THEME_ICONS = {
@@ -505,6 +569,12 @@ const state = {
   watchlist: load(LS.wl, DEFAULT_WATCHLIST),
   interval: +load(LS.iv, 30),
   theme: load(LS.theme, "auto"),
+  fhKey: load(LS.fh, ""),
+  fhStatus: "off",   // off | connecting | live | error
+  fhNote: "",        // human-readable reason when status is error
+  live: {},          // plain ticker -> { c, pc, d, dp, at }
+  fhSock: null,
+  fhTimers: {},
   perfCol: load(LS.perf, "change"),
   sort: load(LS.sort, { col: "change", dir: -1 }),
   timer: null,
@@ -574,9 +644,11 @@ function marketStatus() {
   return { open: false, txt: "Closed" };
 }
 
-/** Attach a directional flash when a symbol's price moves between refreshes. */
+/** Attach a directional flash when a value changes between paints. Keeps its own
+ *  record of what was last shown, so it fires for live ticks as well as refreshes. */
 function flash(el, sym, close) {
   const prev = state.prevClose[sym];
+  if (isNum(close)) state.prevClose[sym] = close;
   if (isNum(prev) && isNum(close) && prev !== close) {
     el.classList.remove("fl-up", "fl-down");
     void el.offsetWidth; // restart the animation
@@ -664,10 +736,6 @@ async function refresh() {
     state.breadthStale = !breadth;
     const ms = Math.round(performance.now() - t0);
 
-    // Remember the previous closes so renderers can flash the deltas.
-    state.prevClose = Object.fromEntries(
-      Object.entries(state.data).map(([k, v]) => [k, v.close])
-    );
     state.data = fresh;
     state.lastOk = new Date();
 
@@ -695,6 +763,176 @@ function setStatus(kind, txt) {
   const chip = $("mktChip");
   chip.textContent = m.txt;
   chip.className = "chip-mkt " + (m.open ? "open" : "closed");
+}
+
+/* ══════════════════════════════════════════════════════════
+   REAL-TIME OVERLAY (Finnhub, optional)
+   ══════════════════════════════════════════════════════════ */
+
+/** US-listed equities and ETFs on the page, as plain Finnhub tickers.
+ *  Indices, futures, FX, rates and crypto are excluded: they already stream from the
+ *  scanner, and the free Finnhub plan does not carry index symbols anyway. */
+function fhSymbols() {
+  const eq = (s) => /^(NASDAQ|NYSE|AMEX):/.test(s) && !s.endsWith(":IXIC") && !s.endsWith(":NDX");
+  const from = [...state.watchlist, ...PULSE.map((d) => d.s), ...SECTORS.map((d) => d.s)];
+  return [...new Set(from.filter(eq).map((s) => s.split(":")[1]))];
+}
+
+function fhSetStatus(status, note = "") {
+  state.fhStatus = status;
+  state.fhNote = note;
+  renderCfg();
+}
+
+/** REST snapshot. Gives the live price *and* the previous close, which the socket
+ *  never sends but every percentage on the page is measured against. */
+async function fhSnapshot() {
+  const syms = fhSymbols();
+  if (!state.fhKey || !syms.length) return;
+
+  const results = await Promise.all(syms.map(async (s) => {
+    try {
+      const r = await fetch(`${FH.rest}/quote?symbol=${encodeURIComponent(s)}&token=${encodeURIComponent(state.fhKey)}`);
+      if (r.status === 401 || r.status === 403) throw new Error("auth");
+      if (r.status === 429) throw new Error("rate");
+      if (!r.ok) throw new Error("http" + r.status);
+      const q = await r.json();
+      return { s, q };
+    } catch (e) {
+      return { s, err: e.message };
+    }
+  }));
+
+  const authFailed = results.some((r) => r.err === "auth");
+  if (authFailed) {
+    fhStop();
+    fhSetStatus("error", "API key rejected");
+    return;
+  }
+  if (results.every((r) => r.err)) {
+    fhSetStatus("error", results[0].err === "rate" ? "rate limit reached" : "provider unreachable");
+    return;
+  }
+
+  for (const { s, q } of results) {
+    // Finnhub returns zeroes rather than an error for symbols it does not carry.
+    if (!q || !isNum(q.c) || q.c === 0) continue;
+    state.live[s] = { c: q.c, pc: q.pc, d: q.d, dp: q.dp, at: Date.now() };
+  }
+  if (state.fhStatus !== "live") fhSetStatus("live");
+  scheduleLiveRender();
+}
+
+function fhConnect() {
+  if (!state.fhKey) return;
+  fhSetStatus("connecting");
+
+  let sock;
+  try {
+    sock = new WebSocket(`${FH.ws}?token=${encodeURIComponent(state.fhKey)}`);
+  } catch {
+    fhSetStatus("error", "could not open socket");
+    return;
+  }
+  state.fhSock = sock;
+
+  sock.onopen = () => {
+    for (const s of fhSymbols()) sock.send(JSON.stringify({ type: "subscribe", symbol: s }));
+    fhSetStatus("live");
+  };
+
+  sock.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.type === "error") { fhSetStatus("error", msg.msg || "provider error"); return; }
+    if (msg.type !== "trade" || !Array.isArray(msg.data)) return;
+
+    for (const t of msg.data) {
+      const prev = state.live[t.s];
+      if (!prev) continue;                     // no previous close yet — wait for the snapshot
+      prev.c = t.p;
+      prev.at = Date.now();
+      if (isNum(prev.pc) && prev.pc !== 0) {
+        prev.d = t.p - prev.pc;
+        prev.dp = (prev.d / prev.pc) * 100;
+      }
+    }
+    scheduleLiveRender();
+  };
+
+  sock.onclose = () => {
+    if (state.fhSock !== sock) return;         // superseded by a newer socket
+    state.fhSock = null;
+    if (!state.fhKey) return;                  // intentional teardown
+    // An immediate close with nothing received is what a bad token looks like.
+    if (state.fhStatus === "connecting") fhSetStatus("error", "connection refused — check the key");
+    else {
+      fhSetStatus("connecting", "reconnecting");
+      state.fhTimers.retry = setTimeout(fhConnect, 5000);
+    }
+  };
+
+  sock.onerror = () => { /* onclose always follows; handled there */ };
+}
+
+/** Keep the socket's subscriptions in step with an edited watchlist, without
+ *  tearing down the feed and losing every price already on screen. */
+function fhSubscribe(symbol) {
+  const t = symbol.split(":")[1];
+  if (!t || !state.fhKey) return;
+  if (state.fhSock?.readyState === WebSocket.OPEN) {
+    state.fhSock.send(JSON.stringify({ type: "subscribe", symbol: t }));
+  }
+  fhSnapshot();
+}
+
+function fhUnsubscribe(symbol) {
+  const t = symbol.split(":")[1];
+  if (!t) return;
+  if (state.fhSock?.readyState === WebSocket.OPEN) {
+    state.fhSock.send(JSON.stringify({ type: "unsubscribe", symbol: t }));
+  }
+  delete state.live[t];
+}
+
+function fhStop() {
+  clearTimeout(state.fhTimers.retry);
+  clearInterval(state.fhTimers.snap);
+  const sock = state.fhSock;
+  state.fhSock = null;
+  if (sock) { try { sock.close(); } catch {} }
+}
+
+function fhStart() {
+  fhStop();
+  state.live = {};
+  if (!state.fhKey) { fhSetStatus("off"); renderAll(); return; }
+  fhSnapshot();
+  fhConnect();
+  state.fhTimers.snap = setInterval(fhSnapshot, FH.resnapshotMs);
+}
+
+/** Coalesce bursts of trades into one repaint. */
+function scheduleLiveRender() {
+  if (state.fhTimers.render) return;
+  state.fhTimers.render = setTimeout(() => {
+    state.fhTimers.render = null;
+    renderPulse();
+    renderSectors();
+    renderWatchlist();
+  }, FH.renderMs);
+}
+
+/** Price fields for a scanner row, preferring the live quote when one exists.
+ *  Everything else on the row (P/E, RSI, performance, market cap) still comes
+ *  from the scanner — Finnhub is only overlaying the price. */
+function quoteOf(row, symbol) {
+  const ticker = row?.ticker ?? symbol?.split(":")[1];
+  const l = state.live[ticker];
+  if (l && isNum(l.c) && isNum(l.dp)) {
+    return { close: l.c, change: l.dp, change_abs: l.d, live: true };
+  }
+  return { close: row?.close, change: row?.change, change_abs: row?.change_abs, live: false };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -920,17 +1158,18 @@ function renderPulse() {
   const box = $("pulse");
   box.innerHTML = PULSE.map((d) => {
     const r = state.data[d.s];
-    const rt = r?.update_mode === "streaming";
+    const q = quoteOf(r, d.s);
+    const rt = q.live || r?.update_mode === "streaming";
     return `
       <div class="card" data-sym="${esc(d.s)}">
         <div class="lbl">
           <span>${esc(d.n)}</span>
-          <span class="tick" title="${rt ? "real-time" : "delayed quote"}">${rt ? "RT" : "DLY"}</span>
+          <span class="tick ${q.live ? "livetick" : ""}" title="${q.live ? "real-time via Finnhub" : rt ? "real-time" : "delayed quote"}">${rt ? "RT" : "DLY"}</span>
         </div>
-        <div class="val">${esc(fmtVal(r?.close, d))}</div>
-        <div class="chg ${dirClass(r?.change)}">
-          ${esc(pct(r?.change))}
-          ${isNum(r?.change_abs) ? `<span style="opacity:.6"> ${esc((r.change_abs >= 0 ? "+" : "") + num(r.change_abs, d.dp ?? 2))}</span>` : ""}
+        <div class="val">${esc(fmtVal(q.close, d))}</div>
+        <div class="chg ${dirClass(q.change)}">
+          ${esc(pct(q.change))}
+          ${isNum(q.change_abs) ? `<span style="opacity:.6"> ${esc((q.change_abs >= 0 ? "+" : "") + num(q.change_abs, d.dp ?? 2))}</span>` : ""}
         </div>
         ${d.note ? `<div class="lbl" style="margin:5px 0 0"><span class="tick">${esc(d.note)}</span></div>` : ""}
       </div>`;
@@ -938,7 +1177,7 @@ function renderPulse() {
 
   for (const el of box.children) {
     const sym = el.dataset.sym;
-    flash(el, sym, state.data[sym]?.close);
+    flash(el, sym, quoteOf(state.data[sym], sym).close);
   }
 }
 
@@ -1014,7 +1253,8 @@ function heatColor(v, max) {
 function renderSectors() {
   const col = state.perfCol;
   const rows = SECTORS
-    .map((s) => ({ ...s, v: state.data[s.s]?.[col] }))
+    // Only the 1-day column has a live equivalent; the longer windows stay on the scanner.
+    .map((s) => ({ ...s, v: col === "change" ? quoteOf(state.data[s.s], s.s).change : state.data[s.s]?.[col] }))
     .sort((a, b) => (isNum(b.v) ? b.v : -1e9) - (isNum(a.v) ? a.v : -1e9));
 
   const max = Math.max(0.5, ...rows.filter((r) => isNum(r.v)).map((r) => Math.abs(r.v)));
@@ -1061,9 +1301,15 @@ function renderWatchlist() {
     return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}">${esc(c.n)} ${ar}</th>`;
   }).join("");
 
-  // rows
+  // Rows carry the live price merged in, so sorting and the 52-week marker
+  // both reflect what is actually on screen.
   const rows = state.watchlist
-    .map((s) => state.data[s])
+    .map((s) => {
+      const r = state.data[s];
+      if (!r) return null;
+      const q = quoteOf(r, s);
+      return { ...r, close: q.close, change: q.change, change_abs: q.change_abs, _live: q.live };
+    })
     .filter(Boolean);
 
   const { col, dir } = state.sort;
@@ -1097,7 +1343,7 @@ function renderWatchlist() {
           <span class="sym">${esc(r.ticker)}</span>
           <span class="co" title="${esc(r.description)}">${esc(r.description)}</span>
         </td>
-        <td>${esc(num(r.close, 2))}</td>
+        <td>${r._live ? `<span class="livedot" title="real-time"></span>` : ""}${esc(num(r.close, 2))}</td>
         <td class="${dirClass(r.change)}">${esc(pct(r.change))}</td>
         <td class="${dirClass(r["Perf.W"])}">${esc(pct(r["Perf.W"], 1))}</td>
         <td class="${dirClass(r["Perf.1M"])}">${esc(pct(r["Perf.1M"], 1))}</td>
@@ -1180,6 +1426,7 @@ async function addTicker() {
     state.watchlist.push(sym);
     save(LS.wl, state.watchlist);
     inp.value = "";
+    fhSubscribe(sym);
     await refresh();
   } catch (err) {
     errBox.innerHTML = `<div class="err">Could not add “${esc(raw)}”: ${esc(err.message)}</div>`;
@@ -1192,6 +1439,7 @@ function removeTicker(sym) {
   state.watchlist = state.watchlist.filter((s) => s !== sym);
   save(LS.wl, state.watchlist);
   delete state.data[sym];
+  fhUnsubscribe(sym);
   renderWatchlist();
 }
 
@@ -1203,6 +1451,52 @@ function schedule() {
   clearInterval(state.timer);
   if (state.interval > 0) state.timer = setInterval(refresh, state.interval * 1000);
 }
+
+/* ---------- data feed settings ---------- */
+
+function renderCfg() {
+  const { fhStatus: s, fhNote: note } = state;
+  const label = { off: "Delayed", connecting: "Connecting", live: "Real-time", error: "Delayed" }[s];
+  $("cfgLbl").textContent = label;
+  $("cfgDot").className = "feed-dot " + (s === "off" ? "" : s);
+  $("cfgBtn").title = s === "live"
+    ? "US equities streaming live from Finnhub"
+    : s === "error" ? `Falling back to delayed data — ${note}`
+    : s === "connecting" ? "Connecting to Finnhub…"
+    : "US equities are 15 minutes delayed";
+
+  const st = $("fhState");
+  if (s === "live")            { st.className = "cfg-s ok";   st.textContent = `● Live — ${fhSymbols().length} symbols streaming`; }
+  else if (s === "connecting") { st.className = "cfg-s wait"; st.textContent = "○ Connecting…"; }
+  else if (s === "error")      { st.className = "cfg-s bad";  st.textContent = `● ${note} — using delayed data`; }
+  else                         { st.className = "cfg-s";      st.textContent = "○ No key — using delayed data"; }
+}
+
+$("cfgBtn").addEventListener("click", () => {
+  const box = $("cfg"), open = box.hidden;
+  box.hidden = !open;
+  $("cfgBtn").setAttribute("aria-expanded", String(open));
+  if (open) { $("fhKey").value = state.fhKey; $("fhKey").focus(); }
+});
+
+// Click-away closes the panel, but not clicks inside it.
+document.addEventListener("click", (e) => {
+  if (!$("cfg").hidden && !e.target.closest(".cfgwrap")) {
+    $("cfg").hidden = true;
+    $("cfgBtn").setAttribute("aria-expanded", "false");
+  }
+});
+
+function saveKey() {
+  const key = $("fhKey").value.trim();
+  state.fhKey = key;
+  // Clearing the field should leave no trace, not an empty entry.
+  if (key) save(LS.fh, key);
+  else try { localStorage.removeItem(LS.fh); } catch {}
+  fhStart();
+}
+$("fhSave").addEventListener("click", saveKey);
+$("fhKey").addEventListener("keydown", (e) => { if (e.key === "Enter") saveKey(); });
 
 /* ---------- theme ---------- */
 
@@ -1273,6 +1567,9 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) clearInterval(state.timer);
   else { refresh(); schedule(); }
 });
+
+renderCfg();
+fhStart();
 
 setStatus("load", "connecting…");
 setInterval(() => { // keep the market-open chip honest between refreshes
