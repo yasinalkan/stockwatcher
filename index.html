@@ -85,6 +85,9 @@
   }
 
   * { box-sizing: border-box; }
+  /* Any display rule of our own outranks the UA stylesheet's [hidden] { display:none },
+     so panes and toolbars that toggle with the attribute need this to stay hidden. */
+  [hidden] { display: none !important; }
   html, body { margin:0; padding:0; }
   body {
     background: var(--bg); color: var(--text);
@@ -260,7 +263,11 @@
   .seg button:hover:not(.on) { background: var(--btn-hover); }
 
   /* ---------- watchlist ---------- */
+  /* These tables carry more columns than a narrow window fits. They scroll inside
+     their own box so the page itself never scrolls sideways. */
+  .tscroll { overflow-x: auto; }
   table { width:100%; border-collapse: collapse; font-family:var(--mono); font-size:12.5px; font-variant-numeric: tabular-nums; }
+  .tscroll table { min-width: 900px; }
   thead th {
     text-align:right; font-family:var(--sans); font-size:10px; font-weight:600; letter-spacing:.08em;
     text-transform:uppercase; color: var(--text-mute); padding:7px 9px; border-bottom:1px solid var(--line);
@@ -283,8 +290,35 @@
   .x { background:transparent; border:0; color:var(--text-mute); cursor:pointer; padding:2px 5px; font-size:14px; line-height:1; border-radius:4px; }
   .x:hover { color: var(--down); background: var(--down-bg); }
 
-  .add { display:flex; gap:7px; align-items:center; }
+  .add { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
   .add input { width:110px; text-transform:uppercase; font-family:var(--mono); }
+  #addHold input { width:88px; }
+  #addHold input[type="date"] { width:132px; text-transform:none; }
+
+  /* ---------- tabs ---------- */
+  .tabs { display:inline-flex; gap:2px; }
+  .tabs button {
+    background:transparent; border:0; border-bottom:2px solid transparent; border-radius:0;
+    padding:3px 2px 6px; margin-right:14px;
+    font-size:11.5px; font-weight:600; letter-spacing:.15em; text-transform:uppercase;
+    color: var(--text-mute);
+  }
+  .tabs button:hover { background:transparent; color: var(--text-dim); }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+
+  /* ---------- portfolio summary ---------- */
+  .pf { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin-bottom:13px; }
+  .pf .card { padding:11px 13px; }
+  .pf .k { font-size:10.5px; color:var(--text-mute); letter-spacing:.06em; text-transform:uppercase; }
+  .pf .v { font-family:var(--mono); font-size:19px; font-weight:650; margin-top:4px; font-variant-numeric: tabular-nums; }
+  .pf .s { font-family:var(--mono); font-size:11px; margin-top:2px; font-variant-numeric: tabular-nums; }
+
+  tfoot td {
+    text-align:right; padding:9px; border-top:1px solid var(--line); font-weight:650;
+    background: var(--hover); white-space:nowrap;
+  }
+  tfoot td.l { text-align:left; }
+  .pill { font-family:var(--mono); font-size:10px; color:var(--text-mute); }
 
   .msg { color:var(--text-mute); font-size:12px; padding:14px 2px; }
   .err { color: var(--down); font-size:12px; padding:10px 12px; background: var(--down-bg); border:1px solid rgba(240,87,79,.25); border-radius:8px; }
@@ -407,22 +441,51 @@
   <div class="heat" id="sectors"></div>
 </section>
 
-<!-- ============ WATCHLIST ============ -->
+<!-- ============ EQUITIES: WATCHLIST / HOLDINGS ============ -->
 <section>
   <div class="sec-head">
-    <h2>Watchlist</h2>
-    <span class="badge delay">15-min delayed</span>
+    <div class="tabs" id="tabs" role="tablist">
+      <button role="tab" data-tab="watchlist">Watchlist</button>
+      <button role="tab" data-tab="holdings">My Holdings</button>
+    </div>
+    <span class="badge delay" id="eqBadge">15-min delayed</span>
     <div class="spacer"></div>
-    <div class="add">
+    <div class="add" id="addWatch">
       <input id="addIn" placeholder="TICKER" maxlength="12" autocomplete="off">
       <button id="addBtn">Add</button>
     </div>
+    <div class="add" id="addHold" hidden>
+      <input id="hSym" placeholder="TICKER" maxlength="12" autocomplete="off">
+      <input id="hQty" placeholder="Shares" inputmode="decimal" autocomplete="off">
+      <input id="hAvg" placeholder="Avg cost" inputmode="decimal" autocomplete="off">
+      <input id="hDate" type="date" title="Purchase date (optional)">
+      <button id="hAdd">Add</button>
+    </div>
   </div>
-  <div id="wlErr"></div>
-  <table>
-    <thead><tr id="wlHead"></tr></thead>
-    <tbody id="wlBody"></tbody>
-  </table>
+
+  <!-- watchlist pane -->
+  <div id="paneWatchlist">
+    <div id="wlErr"></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr id="wlHead"></tr></thead>
+        <tbody id="wlBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- holdings pane -->
+  <div id="paneHoldings" hidden>
+    <div id="hErr"></div>
+    <div class="pf" id="pfSummary"></div>
+    <div class="tscroll">
+      <table>
+        <thead><tr id="hHead"></tr></thead>
+        <tbody id="hBody"></tbody>
+        <tfoot id="hFoot"></tfoot>
+      </table>
+    </div>
+  </div>
 </section>
 
 <footer>
@@ -542,7 +605,8 @@ const EXCHANGES = ["NASDAQ", "NYSE", "AMEX"]; // tried in order when resolving a
 
 const LS = {
   wl: "sw.watchlist", iv: "sw.interval", sort: "sw.sort",
-  perf: "sw.perf", theme: "sw.theme", fh: "sw.finnhubKey"
+  perf: "sw.perf", theme: "sw.theme", fh: "sw.finnhubKey",
+  hold: "sw.holdings", tab: "sw.tab", hsort: "sw.holdSort"
 };
 
 // Optional real-time overlay. The scanner's anonymous entitlement for US equities is
@@ -569,6 +633,10 @@ const state = {
   breadth: {},       // "<symbolset>|<ma>" -> { pct, n }
   prevClose: {},     // symbol -> last seen close, for flash animation
   watchlist: load(LS.wl, DEFAULT_WATCHLIST),
+  // [{ symbol, qty, avg, date }] — one row per symbol; buying more merges into a weighted average.
+  holdings: load(LS.hold, []),
+  tab: load(LS.tab, "watchlist"),
+  holdSort: load(LS.hsort, { col: "value", dir: -1 }),
   interval: +load(LS.iv, 30),
   theme: load(LS.theme, "auto"),
   fhKey: load(LS.fh, ""),
@@ -666,7 +734,7 @@ function allSymbols() {
   return [
     ...ECON.map((d) => d.s), ...CURVE.map((d) => d.s),
     ...PULSE.map((d) => d.s), ...SECTORS.map((d) => d.s),
-    ...state.watchlist
+    ...state.watchlist, ...state.holdings.map((h) => h.symbol)
   ];
 }
 
@@ -776,7 +844,10 @@ function setStatus(kind, txt) {
  *  scanner, and the free Finnhub plan does not carry index symbols anyway. */
 function fhSymbols() {
   const eq = (s) => /^(NASDAQ|NYSE|AMEX):/.test(s) && !s.endsWith(":IXIC") && !s.endsWith(":NDX");
-  const from = [...state.watchlist, ...PULSE.map((d) => d.s), ...SECTORS.map((d) => d.s)];
+  const from = [
+    ...state.watchlist, ...state.holdings.map((h) => h.symbol),
+    ...PULSE.map((d) => d.s), ...SECTORS.map((d) => d.s)
+  ];
   return [...new Set(from.filter(eq).map((s) => s.split(":")[1]))];
 }
 
@@ -922,6 +993,7 @@ function scheduleLiveRender() {
     renderPulse();
     renderSectors();
     renderWatchlist();
+    renderHoldings();
   }, FH.renderMs);
 }
 
@@ -1371,6 +1443,186 @@ function renderWatchlist() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   RENDER — holdings / P&L
+   ══════════════════════════════════════════════════════════ */
+
+const H_COLS = [
+  { k: "ticker", n: "Symbol", l: true },
+  { k: "qty",    n: "Shares" },
+  { k: "avg",    n: "Avg Cost" },
+  { k: "price",  n: "Price" },
+  { k: "cost",   n: "Cost Basis" },
+  { k: "value",  n: "Market Value" },
+  { k: "pl",     n: "Unreal. P&L" },
+  { k: "plpct",  n: "P&L %" },
+  { k: "dayPl",  n: "Day P&L" },
+  { k: "weight", n: "Weight" },
+  { k: "held",   n: "Held" },
+  { k: "sector", n: "Sector", l: true },
+  { k: "_x",     n: "" }
+];
+
+/** Share counts: whole numbers stay bare, fractions keep only the digits they need. */
+const shares = (v) => {
+  if (!isNum(v)) return "—";
+  if (v % 1 === 0) return num(v, 0);
+  return v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 4 });
+};
+
+const money = (v, dp = 2) =>
+  !isNum(v) ? "—" : (v < 0 ? "-" : "") + "$" + num(Math.abs(v), dp);
+const signedMoney = (v, dp = 2) =>
+  !isNum(v) ? "—" : (v >= 0 ? "+" : "-") + "$" + num(Math.abs(v), dp);
+
+/** Days held, shown as the coarsest unit that still reads precisely. */
+function heldFor(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + "T00:00:00");
+  if (isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86400000);
+  if (days < 0) return null;
+  if (days === 0) return "today";
+  if (days < 31) return days + "d";
+  if (days < 365) return Math.floor(days / 30.44) + "mo";
+  const y = days / 365.25;
+  return (y < 10 ? y.toFixed(1) : Math.round(y)) + "y";
+}
+
+/** Position rows plus portfolio totals, priced off the live quote when one exists. */
+function computePortfolio() {
+  const rows = state.holdings.map((h) => {
+    const r = state.data[h.symbol];
+    const q = quoteOf(r, h.symbol);
+    const price = q.close;
+    const cost = h.qty * h.avg;
+    const value = isNum(price) ? h.qty * price : null;
+    const pl = isNum(value) ? value - cost : null;
+    // change_abs is the move per share since the previous close.
+    const dayPl = isNum(q.change_abs) ? q.change_abs * h.qty : null;
+
+    return {
+      symbol: h.symbol,
+      ticker: r?.ticker ?? h.symbol.split(":")[1],
+      description: r?.description ?? "",
+      sector: r?.sector ?? "",
+      qty: h.qty, avg: h.avg, date: h.date || "",
+      price, cost, value, pl,
+      plpct: isNum(pl) && cost > 0 ? (pl / cost) * 100 : null,
+      dayPl,
+      held: heldFor(h.date),
+      live: q.live
+    };
+  });
+
+  const sum = (f) => rows.reduce((a, r) => a + (isNum(r[f]) ? r[f] : 0), 0);
+  const totals = {
+    cost: sum("cost"),
+    value: sum("value"),
+    dayPl: sum("dayPl"),
+    // Only positions we could actually price belong in the return figure.
+    pricedCost: rows.reduce((a, r) => a + (isNum(r.value) ? r.cost : 0), 0)
+  };
+  totals.pl = totals.value - totals.pricedCost;
+  totals.plpct = totals.pricedCost > 0 ? (totals.pl / totals.pricedCost) * 100 : null;
+  totals.dayPct = totals.value - totals.dayPl !== 0
+    ? (totals.dayPl / (totals.value - totals.dayPl)) * 100 : null;
+  totals.unpriced = rows.filter((r) => !isNum(r.value)).length;
+
+  for (const r of rows) {
+    r.weight = totals.value > 0 && isNum(r.value) ? (r.value / totals.value) * 100 : null;
+  }
+  return { rows, totals };
+}
+
+function renderHoldings() {
+  const { rows, totals } = computePortfolio();
+
+  // ---- summary cards ----
+  if (!rows.length) {
+    $("pfSummary").innerHTML = "";
+  } else {
+    const cards = [
+      { k: "Market Value", v: money(totals.value),
+        s: totals.unpriced ? `${totals.unpriced} position(s) unpriced` : `${rows.length} position(s)`, c: "" },
+      { k: "Cost Basis", v: money(totals.cost), s: "", c: "" },
+      { k: "Unrealised P&L", v: signedMoney(totals.pl),
+        s: isNum(totals.plpct) ? pct(totals.plpct) : "", c: dirClass(totals.pl) },
+      { k: "Today", v: signedMoney(totals.dayPl),
+        s: isNum(totals.dayPct) ? pct(totals.dayPct) : "", c: dirClass(totals.dayPl) }
+    ];
+    $("pfSummary").innerHTML = cards.map((c) => `
+      <div class="card">
+        <div class="k">${esc(c.k)}</div>
+        <div class="v ${c.c}">${esc(c.v)}</div>
+        <div class="s ${c.c}">${esc(c.s)}</div>
+      </div>`).join("");
+  }
+
+  // ---- header ----
+  $("hHead").innerHTML = H_COLS.map((c) => {
+    const on = state.holdSort.col === c.k;
+    const ar = on ? `<span class="ar">${state.holdSort.dir < 0 ? "▼" : "▲"}</span>` : "";
+    return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}">${esc(c.n)} ${ar}</th>`;
+  }).join("");
+
+  // ---- body ----
+  const body = $("hBody"), foot = $("hFoot");
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="${H_COLS.length}" class="l"><div class="msg">
+      No positions yet — add a ticker with the number of shares and your average cost.
+      Everything stays in this browser.</div></td></tr>`;
+    foot.innerHTML = "";
+    return;
+  }
+
+  const { col, dir } = state.holdSort;
+  rows.sort((a, b) => {
+    const x = a[col], y = b[col];
+    if (typeof x === "string" || typeof y === "string")
+      return String(x ?? "").localeCompare(String(y ?? "")) * dir;
+    const xn = isNum(x) ? x : -Infinity, yn = isNum(y) ? y : -Infinity;
+    return (xn - yn) * dir;
+  });
+
+  body.innerHTML = rows.map((r) => `
+    <tr data-sym="${esc(r.symbol)}">
+      <td class="l">
+        <span class="sym">${esc(r.ticker)}</span>
+        <span class="co" title="${esc(r.description)}">${esc(r.description)}</span>
+      </td>
+      <td>${esc(shares(r.qty))}</td>
+      <td>${esc(money(r.avg))}</td>
+      <td>${r.live ? `<span class="livedot" title="real-time"></span>` : ""}${esc(money(r.price))}</td>
+      <td>${esc(money(r.cost))}</td>
+      <td>${esc(money(r.value))}</td>
+      <td class="${dirClass(r.pl)}">${esc(signedMoney(r.pl))}</td>
+      <td class="${dirClass(r.plpct)}">${esc(pct(r.plpct))}</td>
+      <td class="${dirClass(r.dayPl)}">${esc(signedMoney(r.dayPl))}</td>
+      <td>${isNum(r.weight) ? esc(num(r.weight, 1)) + "%" : "—"}</td>
+      <td><span class="pill" title="${esc(r.date || "no date given")}">${esc(r.held || "—")}</span></td>
+      <td class="l"><span class="sect">${esc(r.sector || "—")}</span></td>
+      <td><button class="x" data-hdel="${esc(r.symbol)}" title="Remove">×</button></td>
+    </tr>`).join("");
+
+  foot.innerHTML = `
+    <tr>
+      <td class="l">Total</td>
+      <td></td><td></td><td></td>
+      <td>${esc(money(totals.cost))}</td>
+      <td>${esc(money(totals.value))}</td>
+      <td class="${dirClass(totals.pl)}">${esc(signedMoney(totals.pl))}</td>
+      <td class="${dirClass(totals.plpct)}">${esc(pct(totals.plpct))}</td>
+      <td class="${dirClass(totals.dayPl)}">${esc(signedMoney(totals.dayPl))}</td>
+      <td>100%</td><td></td><td></td><td></td>
+    </tr>`;
+
+  for (const tr of body.children) {
+    const sym = tr.dataset.sym;
+    if (sym) flash(tr, "h:" + sym, rows.find((r) => r.symbol === sym)?.price);
+  }
+}
+
 function rangePos(r) {
   const lo = r.price_52_week_low, hi = r.price_52_week_high, c = r.close;
   if (!isNum(lo) || !isNum(hi) || !isNum(c) || hi <= lo) return null;
@@ -1389,6 +1641,7 @@ function renderAll() {
   renderBreadth();
   renderSectors();
   renderWatchlist();
+  renderHoldings();
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1437,11 +1690,80 @@ async function addTicker() {
   }
 }
 
+/* ---------- holdings editing ---------- */
+
+/** Accepts "1,234.56" as well as "1234.56" — people paste both. */
+function parseNum(s) {
+  const v = Number(String(s).replace(/[$\s]/g, "").replace(/,/g, ""));
+  return isFinite(v) ? v : NaN;
+}
+
+async function addHolding() {
+  const errBox = $("hErr");
+  errBox.innerHTML = "";
+
+  const raw = $("hSym").value.trim().toUpperCase();
+  const qty = parseNum($("hQty").value);
+  const avg = parseNum($("hAvg").value);
+  const date = $("hDate").value || "";
+
+  const fail = (m) => { errBox.innerHTML = `<div class="err">${esc(m)}</div>`; };
+
+  if (!raw) return fail("Enter a ticker.");
+  if (!isFinite(qty) || qty <= 0) return fail("Shares must be a positive number.");
+  if (!isFinite(avg) || avg <= 0) return fail("Average cost must be a positive number.");
+  if (date && new Date(date + "T00:00:00") > new Date()) return fail("Purchase date cannot be in the future.");
+
+  $("hAdd").disabled = true;
+  try {
+    const sym = await resolve(raw);
+    if (!sym) return fail(`No US-listed symbol found for “${raw}”.`);
+
+    const existing = state.holdings.find((h) => h.symbol === sym);
+    if (existing) {
+      // Buying more of something already held: blend into a weighted average cost
+      // and keep the earliest purchase date as the start of the holding period.
+      const totalQty = existing.qty + qty;
+      const blended = (existing.qty * existing.avg + qty * avg) / totalQty;
+      existing.qty = totalQty;
+      existing.avg = blended;
+      if (date && (!existing.date || date < existing.date)) existing.date = date;
+      errBox.innerHTML = `<div class="msg">${esc(sym.split(":")[1])} now ${shares(totalQty)} shares
+        at a blended average of ${esc(money(blended))}.</div>`;
+    } else {
+      state.holdings.push({ symbol: sym, qty, avg, date });
+    }
+
+    save(LS.hold, state.holdings);
+    $("hSym").value = ""; $("hQty").value = ""; $("hAvg").value = ""; $("hDate").value = "";
+    fhSubscribe(sym);
+    await refresh();
+  } catch (err) {
+    fail(`Could not add “${raw}”: ${err.message}`);
+  } finally {
+    $("hAdd").disabled = false;
+  }
+}
+
+function removeHolding(sym) {
+  state.holdings = state.holdings.filter((h) => h.symbol !== sym);
+  save(LS.hold, state.holdings);
+  // Keep the feed subscription if the symbol is still on the watchlist.
+  if (!state.watchlist.includes(sym)) {
+    delete state.data[sym];
+    fhUnsubscribe(sym);
+  }
+  renderHoldings();
+}
+
 function removeTicker(sym) {
   state.watchlist = state.watchlist.filter((s) => s !== sym);
   save(LS.wl, state.watchlist);
-  delete state.data[sym];
-  fhUnsubscribe(sym);
+  // The same symbol may still be held, in which case its data must stay.
+  if (!state.holdings.some((h) => h.symbol === sym)) {
+    delete state.data[sym];
+    fhUnsubscribe(sym);
+  }
   renderWatchlist();
 }
 
@@ -1543,6 +1865,47 @@ $("wlBody").addEventListener("click", (e) => {
   if (btn) removeTicker(btn.dataset.del);
 });
 
+/* ---------- tabs ---------- */
+
+function applyTab() {
+  for (const b of $("tabs").children) {
+    b.setAttribute("aria-selected", String(b.dataset.tab === state.tab));
+  }
+  const holdings = state.tab === "holdings";
+  $("paneWatchlist").hidden = holdings;
+  $("paneHoldings").hidden = !holdings;
+  $("addWatch").hidden = holdings;
+  $("addHold").hidden = !holdings;
+  if (holdings) renderHoldings(); else renderWatchlist();
+}
+
+$("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]");
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  save(LS.tab, state.tab);
+  applyTab();
+});
+
+$("hAdd").addEventListener("click", addHolding);
+for (const id of ["hSym", "hQty", "hAvg", "hDate"]) {
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") addHolding(); });
+}
+
+$("hBody").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-hdel]");
+  if (btn) removeHolding(btn.dataset.hdel);
+});
+
+$("hHead").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-col]");
+  if (!th || th.dataset.col === "_x") return;
+  const col = th.dataset.col;
+  state.holdSort = { col, dir: state.holdSort.col === col ? -state.holdSort.dir : -1 };
+  save(LS.hsort, state.holdSort);
+  renderHoldings();
+});
+
 $("wlHead").addEventListener("click", (e) => {
   const th = e.target.closest("th[data-col]");
   if (!th || th.dataset.col === "_x") return;
@@ -1570,6 +1933,7 @@ document.addEventListener("visibilitychange", () => {
   else { refresh(); schedule(); }
 });
 
+applyTab();
 renderCfg();
 fhStart();
 
