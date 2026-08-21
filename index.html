@@ -196,6 +196,14 @@
   .fl-up   { animation: flashUp .9s ease-out; }
   .fl-down { animation: flashDown .9s ease-out; }
 
+  /* ---------- grouped economic indicators ---------- */
+  .eg { margin-bottom: 15px; }
+  .eg-h {
+    font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--text-mute);
+    margin:0 0 7px; padding-bottom:5px; border-bottom:1px solid var(--line-soft);
+  }
+  .eg-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(158px,1fr)); gap:9px; }
+
   /* ---------- economic assessment ---------- */
   .assess { background: var(--panel); border:1px solid var(--line-soft); border-radius:11px; padding:17px 18px; }
 
@@ -451,7 +459,7 @@
     <span class="badge" id="econBadge">latest release</span>
     <span class="sec-note">Change shown is vs. the previous print, not intraday</span>
   </div>
-  <div class="grid" id="econ" style="grid-template-columns: repeat(auto-fit, minmax(178px,1fr));"></div>
+  <div id="econ"></div>
 </section>
 
 <!-- ============ YIELD CURVE ============ -->
@@ -579,19 +587,70 @@ const COLS = [
   "dividend_yield_recent", "relative_volume_10d_calc"
 ];
 
-// Economic indicators. `dp` = decimals, `fmt` overrides the default number format.
-const ECON = [
-  { s: "ECONOMICS:USINTR",  n: "Fed Funds Rate",   u: "%",  dp: 2 },
-  { s: "ECONOMICS:USIRYY",  n: "CPI",              u: "%",  dp: 1, sub: "YoY" },
-  { s: "ECONOMICS:USCCPI",  n: "Core CPI",         u: "%",  dp: 1, sub: "YoY" },
-  { s: "ECONOMICS:USUR",    n: "Unemployment",     u: "%",  dp: 1 },
-  { s: "ECONOMICS:USNFP",   n: "Nonfarm Payrolls", fmt: "count" },
-  { s: "ECONOMICS:USGDPQQ", n: "Real GDP",         u: "%",  dp: 1, sub: "QoQ" },
-  { s: "ECONOMICS:USBCOI",  n: "ISM PMI",          dp: 1 },
-  { s: "ECONOMICS:USIJC",   n: "Jobless Claims",   fmt: "count" },
-  { s: "ECONOMICS:USM2",    n: "M2 Money Supply",  fmt: "usd" },
-  { s: "ECONOMICS:USCS",    n: "Consumer Spending", fmt: "usd" }
+// Economic indicators, grouped the way they are read. `dp` = decimals, `fmt` overrides
+// the default number format. Selection follows the high-importance releases on a standard
+// economic calendar, limited to what this data source actually carries.
+const ECON_GROUPS = [
+  {
+    n: "Growth & Activity",
+    items: [
+      { s: "ECONOMICS:USGDPQQ", n: "Real GDP",          u: "%", dp: 1, sub: "QoQ" },
+      { s: "ECONOMICS:USGDPYY", n: "Real GDP",          u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USBCOI",  n: "ISM Manufacturing", dp: 1,  sub: "PMI" },
+      { s: "ECONOMICS:USNMBA",  n: "ISM Services",      dp: 1,  sub: "activity" },
+      { s: "ECONOMICS:USRSMM",  n: "Retail Sales",      u: "%", dp: 1, sub: "MoM" },
+      { s: "ECONOMICS:USRSCG",  n: "Retail Control Grp", u: "%", dp: 1, sub: "MoM" },
+      { s: "ECONOMICS:USIPMM",  n: "Industrial Prod.",  u: "%", dp: 1, sub: "MoM" },
+      { s: "ECONOMICS:USDGO",   n: "Durable Goods",     u: "%", dp: 1, sub: "MoM" },
+      { s: "ECONOMICS:USCS",    n: "Consumer Spending", fmt: "usd" }
+    ]
+  },
+  {
+    n: "Labour",
+    items: [
+      { s: "ECONOMICS:USUR",    n: "Unemployment",      u: "%", dp: 1 },
+      { s: "ECONOMICS:USNFP",   n: "Nonfarm Payrolls",  fmt: "count" },
+      { s: "ECONOMICS:USAHEYY", n: "Avg Hourly Earnings", u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USJO",    n: "Job Openings",      fmt: "count", sub: "JOLTS" },
+      { s: "ECONOMICS:USIJC",   n: "Initial Claims",    fmt: "count" },
+      { s: "ECONOMICS:USCJC",   n: "Continuing Claims", fmt: "count" }
+    ]
+  },
+  {
+    n: "Inflation",
+    items: [
+      { s: "ECONOMICS:USCPCEPIAC", n: "Core PCE",       u: "%", dp: 1, sub: "YoY · Fed target" },
+      { s: "ECONOMICS:USPCEPIAC",  n: "PCE",            u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USIRYY",     n: "CPI",            u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USCCPI",     n: "Core CPI",       u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USPPIYY",    n: "PPI",            u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USCPPYY",    n: "Core PPI",       u: "%", dp: 1, sub: "YoY" },
+      { s: "ECONOMICS:USMIE1Y",    n: "Inflation Exp.", u: "%", dp: 1, sub: "1y · Michigan" },
+      { s: "ECONOMICS:USSI",       n: "Services Inflation", u: "%", dp: 1, sub: "YoY" }
+    ]
+  },
+  {
+    n: "Policy & Money",
+    items: [
+      { s: "ECONOMICS:USINTR", n: "Fed Funds Rate",  u: "%", dp: 2 },
+      { s: "ECONOMICS:USM2",   n: "M2 Money Supply", fmt: "usd" }
+    ]
+  },
+  {
+    // Shown for context but kept out of the composite — see the assessment footnote.
+    n: "Sentiment & Housing",
+    items: [
+      { s: "ECONOMICS:USCCI", n: "Consumer Confidence", dp: 1 },
+      { s: "ECONOMICS:USMCE", n: "Michigan Expectations", dp: 1 },
+      { s: "ECONOMICS:USBOI", n: "NFIB Small Business", dp: 1 },
+      { s: "ECONOMICS:USHMI", n: "NAHB Housing Index", dp: 0 },
+      { s: "ECONOMICS:USBP",  n: "Building Permits", fmt: "count" },
+      { s: "ECONOMICS:USHST", n: "Housing Starts",   fmt: "count" }
+    ]
+  }
 ];
+
+const ECON = ECON_GROUPS.flatMap((g) => g.items);
 
 // Treasury curve. `t` = maturity in years, used for the x-axis.
 const CURVE = [
@@ -1111,12 +1170,52 @@ const SIGNALS = [
                : `output grew ${v.toFixed(1)}% last quarter`
   },
   {
-    id: "ism", pillar: "growth", n: "ISM PMI",
+    id: "ism", pillar: "growth", n: "ISM Manufacturing",
     get: (d) => d["ECONOMICS:USBCOI"]?.close,
     fmt: (v) => v.toFixed(1),
     anchors: [[42, 0], [46, 20], [50, 50], [54, 78], [58, 100]],
     say: (v) => v >= 50 ? `the ISM at ${v.toFixed(1)} shows manufacturing expanding`
                : `the ISM at ${v.toFixed(1)} shows manufacturing contracting`
+  },
+  {
+    // Services are the larger share of US output, so this carries at least as much
+    // weight as the manufacturing survey it sits beside.
+    id: "ismSvc", pillar: "growth", n: "ISM Services",
+    get: (d) => d["ECONOMICS:USNMBA"]?.close,
+    fmt: (v) => v.toFixed(1),
+    anchors: [[42, 0], [46, 20], [50, 50], [54, 78], [58, 100]],
+    say: (v) => v >= 50 ? `services activity is expanding at ${v.toFixed(1)}`
+               : `services activity is contracting at ${v.toFixed(1)}`
+  },
+  {
+    // The control group is the slice that feeds GDP, so it matters more than the headline.
+    id: "retail", pillar: "growth", n: "Retail control group",
+    get: (d) => d["ECONOMICS:USRSCG"]?.close,
+    fmt: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "% MoM",
+    anchors: [[-1.5, 0], [-0.5, 25], [0, 45], [0.4, 70], [1, 92], [1.5, 100]],
+    say: (v) => v < 0 ? `core retail sales fell ${Math.abs(v).toFixed(1)}% on the month`
+               : `core retail sales rose ${v.toFixed(1)}% on the month`
+  },
+  {
+    id: "retailHead", pillar: "growth", n: "Retail sales",
+    get: (d) => d["ECONOMICS:USRSMM"]?.close,
+    fmt: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "% MoM",
+    anchors: [[-2, 0], [-0.5, 28], [0, 48], [0.5, 72], [1.2, 94], [2, 100]],
+    say: null
+  },
+  {
+    id: "indprod", pillar: "growth", n: "Industrial production",
+    get: (d) => d["ECONOMICS:USIPMM"]?.close,
+    fmt: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "% MoM",
+    anchors: [[-1.5, 0], [-0.4, 28], [0, 50], [0.3, 68], [0.8, 90], [1.5, 100]],
+    say: null
+  },
+  {
+    id: "durables", pillar: "growth", n: "Durable goods",
+    get: (d) => d["ECONOMICS:USDGO"]?.close,
+    fmt: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "% MoM",
+    anchors: [[-4, 0], [-1, 30], [0, 50], [1, 72], [3, 94], [5, 100]],
+    say: null
   },
 
   /* ---------------- labour ---------------- */
@@ -1153,6 +1252,21 @@ const SIGNALS = [
     anchors: [[180000, 100], [220000, 85], [260000, 60], [300000, 32], [350000, 10], [400000, 0]],
     say: (v) => `weekly jobless claims run at ${compact(v)}`
   },
+  {
+    // Continuing claims say how hard it is to get re-hired, which initial claims do not.
+    id: "contClaims", pillar: "labour", n: "Continuing claims",
+    get: (d) => d["ECONOMICS:USCJC"]?.close,
+    fmt: (v) => compact(v),
+    anchors: [[1400000, 100], [1650000, 82], [1900000, 60], [2200000, 32], [2700000, 8], [3200000, 0]],
+    say: null
+  },
+  {
+    id: "jolts", pillar: "labour", n: "Job openings",
+    get: (d) => d["ECONOMICS:USJO"]?.close,
+    fmt: (v) => compact(v),
+    anchors: [[4000000, 0], [5500000, 30], [6800000, 58], [8000000, 82], [10000000, 100]],
+    say: null
+  },
 
   /* ---------------- inflation ---------------- */
   {
@@ -1170,6 +1284,55 @@ const SIGNALS = [
     fmt: (v) => v.toFixed(1) + "% YoY",
     anchors: [[0, 35], [1.2, 80], [2, 100], [2.8, 82], [4, 45], [6, 12], [8, 0]],
     say: (v) => `core is ${v.toFixed(1)}%`
+  },
+  {
+    // The measure the Fed's 2% target is actually defined against.
+    id: "corePCE", pillar: "inflation", n: "Core PCE",
+    get: (d) => d["ECONOMICS:USCPCEPIAC"]?.close,
+    fmt: (v) => v.toFixed(1) + "% YoY",
+    anchors: [[0, 35], [1.2, 80], [2, 100], [2.8, 82], [4, 45], [6, 12], [8, 0]],
+    say: (v) => `core PCE — the Fed's target measure — is ${v.toFixed(1)}%`
+  },
+  {
+    id: "pce", pillar: "inflation", n: "PCE",
+    get: (d) => d["ECONOMICS:USPCEPIAC"]?.close,
+    fmt: (v) => v.toFixed(1) + "% YoY",
+    anchors: [[-1, 10], [0, 35], [1.2, 80], [2, 100], [2.8, 80], [4, 42], [6, 12], [8, 0]],
+    say: null
+  },
+  {
+    // Producer prices lead consumer prices, and swing harder, so the band is wider.
+    id: "ppi", pillar: "inflation", n: "PPI",
+    get: (d) => d["ECONOMICS:USPPIYY"]?.close,
+    fmt: (v) => v.toFixed(1) + "% YoY",
+    anchors: [[-3, 20], [-1, 45], [1, 88], [2, 100], [3.5, 72], [5, 38], [8, 8], [11, 0]],
+    say: null
+  },
+  {
+    id: "corePPI", pillar: "inflation", n: "Core PPI",
+    get: (d) => d["ECONOMICS:USCPPYY"]?.close,
+    fmt: (v) => v.toFixed(1) + "% YoY",
+    anchors: [[-2, 25], [0, 55], [2, 100], [3.5, 72], [5, 38], [8, 8], [11, 0]],
+    say: null
+  },
+  {
+    // Expectations becoming unanchored is what turns an inflation episode persistent,
+    // which is why the Fed watches this survey as closely as the prints themselves.
+    id: "infExp", pillar: "inflation", n: "Inflation expectations",
+    get: (d) => d["ECONOMICS:USMIE1Y"]?.close,
+    fmt: (v) => v.toFixed(1) + "% 1y",
+    anchors: [[0.5, 40], [2, 95], [2.8, 88], [3.5, 62], [4.5, 28], [6, 5], [8, 0]],
+    // No leading conjunction — the sentence builder supplies it.
+    say: (v) => v >= 3.5 ? `households expect ${v.toFixed(1)}% inflation a year out`
+               : `households expect ${v.toFixed(1)}% a year out, close to target`
+  },
+  {
+    // Wage growth much above productivity plus target feeds back into services prices.
+    id: "wages", pillar: "inflation", n: "Wage growth",
+    get: (d) => d["ECONOMICS:USAHEYY"]?.close,
+    fmt: (v) => v.toFixed(1) + "% YoY",
+    anchors: [[0.5, 30], [2, 70], [3.2, 92], [4, 72], [5, 42], [6.5, 12], [8, 0]],
+    say: null
   },
 
   /* ---------------- policy & curve ---------------- */
@@ -1359,7 +1522,8 @@ function renderAssessment() {
   // as a proper list rather than spliced with commas, and any missing reading simply
   // drops out of its sentence.
   const sig = (id) => a.signals.find((x) => x.id === id);
-  const line = (id) => { const s = sig(id); return s ? s.say(s.v) : null; };
+  // Not every signal carries a phrase — some are scored but only shown as figures.
+  const line = (id) => { const s = sig(id); return s && s.say ? s.say(s.v) : null; };
 
   const sentence = (parts) => {
     const p = parts.filter(Boolean);
@@ -1375,10 +1539,11 @@ function renderAssessment() {
     : null;
 
   const paras = [
-    sentence([line("gdp"), line("ism")]),
+    sentence([line("gdp"), line("ism"), line("ismSvc"), line("retail")]),
     sentence([unempClause, line("nfp"), line("claims")]),
-    sentence([line("cpi"), line("core"), line("stance")]),
-    sentence([line("curve"), line("vix"), line("breadth")])
+    sentence([line("corePCE"), line("cpi"), line("core"), line("infExp")]),
+    sentence([line("stance"), line("curve")]),
+    sentence([line("vix"), line("breadth")])
   ].filter(Boolean);
 
   box.innerHTML = `
@@ -1442,6 +1607,8 @@ function renderAssessment() {
         financial conditions paper over them.` : ""}
       Each reading is mapped to 0–100 through fixed thresholds — a rule of thumb for reading the dashboard at a
       glance, not a forecast, and not advice.
+      The sentiment and housing indicators below are shown for context but left out of the score: their published
+      surveys are rebased often enough that a defensible threshold could not be set from the data available here.
     </div>`;
 }
 
@@ -1560,7 +1727,14 @@ function renderRegime() {
    ══════════════════════════════════════════════════════════ */
 
 function renderEcon() {
-  $("econ").innerHTML = ECON.map((d) => {
+  $("econ").innerHTML = ECON_GROUPS.map((g) => `
+    <div class="eg">
+      <div class="eg-h">${esc(g.n)}</div>
+      <div class="eg-grid">${g.items.map(econCard).join("")}</div>
+    </div>`).join("");
+}
+
+function econCard(d) {
     const r = state.data[d.s];
     const chg = r?.change_abs, chgPct = r?.change;
 
@@ -1578,7 +1752,6 @@ function renderEcon() {
           ${showPct ? `<span style="opacity:.6"> (${esc(pct(chgPct, 1))})</span>` : ""}
         </div>
       </div>`;
-  }).join("");
 }
 
 /* ══════════════════════════════════════════════════════════
