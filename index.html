@@ -170,6 +170,25 @@
     color: var(--text-dim); margin:0;
   }
   .sec-note { font-size:11px; color: var(--text-mute); }
+
+  /* ---------- collapsible sections ---------- */
+  section.collapsed > :not(.sec-head) { display: none; }
+  /* Toolbars sit inside the header for layout reasons but belong to the content,
+     so they fold away with it — the title, badge and note stay. */
+  section.collapsed .sec-head .add,
+  section.collapsed .sec-head .seg { display: none; }
+  .sec-toggle {
+    background:transparent; border:0; border-radius:5px; padding:2px;
+    display:inline-flex; align-items:center; justify-content:center;
+    color: var(--text-mute); margin-right:-4px; flex:none;
+  }
+  .sec-toggle:hover { background: var(--btn-hover); color: var(--text-dim); border-color:transparent; }
+  .sec-toggle svg { transition: transform .18s ease; }
+  section.collapsed .sec-toggle svg { transform: rotate(-90deg); }
+  /* The heading doubles as the hit target, but only the heading — the badges,
+     tabs and toolbars beside it stay clickable on their own terms. */
+  .sec-head h2 { cursor: pointer; user-select: none; }
+  .sec-head h2:hover { color: var(--text-dim); }
   .badge {
     font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
     padding:2px 6px; border-radius:4px; border:1px solid var(--line);
@@ -435,7 +454,7 @@
 <div id="errBox"></div>
 
 <!-- ============ ASSESSMENT ============ -->
-<section>
+<section data-sec="assessment">
   <div class="sec-head">
     <h2>Economic Assessment</h2>
     <span class="sec-note">A scored read of everything below — what the indicators add up to</span>
@@ -444,7 +463,7 @@
 </section>
 
 <!-- ============ REGIME ============ -->
-<section>
+<section data-sec="regime">
   <div class="sec-head">
     <h2>Macro Regime</h2>
     <span class="sec-note">Derived signals — the conditions your equity positions are priced against</span>
@@ -453,7 +472,7 @@
 </section>
 
 <!-- ============ INDICATORS ============ -->
-<section>
+<section data-sec="indicators">
   <div class="sec-head">
     <h2>Economic Indicators</h2>
     <span class="badge" id="econBadge">latest release</span>
@@ -463,7 +482,7 @@
 </section>
 
 <!-- ============ YIELD CURVE ============ -->
-<section>
+<section data-sec="curve">
   <div class="sec-head">
     <h2>US Treasury Yield Curve</h2>
     <span class="badge rt">real-time</span>
@@ -475,7 +494,7 @@
 </section>
 
 <!-- ============ MARKET PULSE ============ -->
-<section>
+<section data-sec="pulse">
   <div class="sec-head">
     <h2>Market Pulse</h2>
     <span class="sec-note">Indices, volatility, dollar, commodities, FX</span>
@@ -484,7 +503,7 @@
 </section>
 
 <!-- ============ BREADTH ============ -->
-<section>
+<section data-sec="breadth">
   <div class="sec-head">
     <h2>Market Breadth</h2>
     <span class="badge delay" id="breadthBadge">15-min delayed</span>
@@ -494,7 +513,7 @@
 </section>
 
 <!-- ============ SECTORS ============ -->
-<section>
+<section data-sec="sectors">
   <div class="sec-head">
     <h2>Sector Rotation</h2>
     <span class="badge delay">15-min delayed</span>
@@ -511,7 +530,7 @@
 </section>
 
 <!-- ============ EQUITIES: WATCHLIST / HOLDINGS ============ -->
-<section>
+<section data-sec="equities">
   <div class="sec-head">
     <div class="tabs" id="tabs" role="tablist">
       <button role="tab" data-tab="watchlist">Watchlist</button>
@@ -726,7 +745,8 @@ const EXCHANGES = ["NASDAQ", "NYSE", "AMEX"]; // tried in order when resolving a
 const LS = {
   wl: "sw.watchlist", iv: "sw.interval", sort: "sw.sort",
   perf: "sw.perf", theme: "sw.theme", fh: "sw.finnhubKey",
-  hold: "sw.holdings", tab: "sw.tab", hsort: "sw.holdSort"
+  hold: "sw.holdings", tab: "sw.tab", hsort: "sw.holdSort",
+  collapsed: "sw.collapsed"
 };
 
 // Optional real-time overlay. The scanner's anonymous entitlement for US equities is
@@ -757,6 +777,7 @@ const state = {
   holdings: load(LS.hold, []),
   tab: load(LS.tab, "watchlist"),
   holdSort: load(LS.hsort, { col: "value", dir: -1 }),
+  collapsed: new Set(load(LS.collapsed, [])),
   interval: +load(LS.iv, 30),
   theme: load(LS.theme, "auto"),
   fhKey: load(LS.fh, ""),
@@ -2386,6 +2407,42 @@ function schedule() {
   if (state.interval > 0) state.timer = setInterval(refresh, state.interval * 1000);
 }
 
+/* ---------- collapsible sections ---------- */
+
+const CHEVRON = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+
+function setCollapsed(sec, collapsed) {
+  const key = sec.dataset.sec;
+  sec.classList.toggle("collapsed", collapsed);
+  sec.querySelector(".sec-toggle")?.setAttribute("aria-expanded", String(!collapsed));
+  if (collapsed) state.collapsed.add(key); else state.collapsed.delete(key);
+  save(LS.collapsed, [...state.collapsed]);
+}
+
+function initCollapsibles() {
+  for (const sec of document.querySelectorAll("section[data-sec]")) {
+    const head = sec.querySelector(".sec-head");
+    if (!head) continue;
+
+    // The heading is the obvious thing to click, but not every section has one —
+    // the equities section leads with tabs — so every header also gets a chevron.
+    const title = head.querySelector("h2")?.textContent?.trim() ?? sec.dataset.sec;
+    const btn = document.createElement("button");
+    btn.className = "sec-toggle";
+    btn.innerHTML = CHEVRON;
+    btn.setAttribute("aria-label", `Collapse ${title}`);
+    btn.setAttribute("aria-expanded", "true");
+    head.insertBefore(btn, head.firstChild);
+
+    const toggle = () => setCollapsed(sec, !sec.classList.contains("collapsed"));
+    btn.addEventListener("click", toggle);
+    head.querySelector("h2")?.addEventListener("click", toggle);
+
+    setCollapsed(sec, state.collapsed.has(sec.dataset.sec));
+  }
+}
+
 /* ---------- data feed settings ---------- */
 
 function renderCfg() {
@@ -2543,6 +2600,7 @@ document.addEventListener("visibilitychange", () => {
   else { refresh(); schedule(); }
 });
 
+initCollapsibles();
 applyTab();
 renderCfg();
 fhStart();
