@@ -404,12 +404,125 @@
 
   footer { color: var(--text-mute); font-size:10.5px; line-height:1.6; border-top:1px solid var(--line-soft); padding-top:14px; margin-top:30px; }
   footer b { color: var(--text-dim); font-weight:600; }
+
+  /* Workspace design: quiet surfaces, clear hierarchy, an evergreen accent. */
+  :root[data-theme="light"] {
+    --bg:#f5f6f4; --panel:#fff; --panel-2:#f3f5f3; --line:#dce3dd;
+    --line-soft:#e8ece7; --text:#182b28; --text-dim:#576962; --text-mute:#738079;
+    --accent:#247658; --up:#17835e; --up-bg:#eaf6ef; --down:#c45151;
+    --header-bg:rgba(245,246,244,.95); --grid:#e9eee9;
+    --btn-hover:#e8eee8; --btn-hover-bd:#b9cabe; --shadow:0 3px 16px rgba(25,48,37,.025);
+  }
+  :root[data-theme="dark"] {
+    --bg:#101917; --panel:#182320; --panel-2:#1e2c27; --line:#34443c;
+    --line-soft:#283830; --text:#e6eee8; --text-dim:#adbbb2; --text-mute:#8a9f92;
+    --accent:#64bf92; --header-bg:rgba(16,25,23,.95); --grid:#293a32;
+    --btn-hover:#2b3c32; --btn-hover-bd:#496653;
+  }
+  html { scroll-behavior:smooth; scroll-padding-top:110px; }
+  body { font-size:14px; }
+  button, input, select { min-height:36px; border-radius:8px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+  button:disabled { opacity:.55; cursor:wait; }
+  .sidebar { position:fixed; inset:0 auto 0 0; width:224px; background:#122622; color:#b4c5bd; padding:32px 20px; display:flex; flex-direction:column; z-index:30; }
+  .side-brand { display:flex; gap:10px; align-items:center; color:#f4f8f5; text-decoration:none; font-size:19px; font-weight:650; letter-spacing:-.6px; padding:0 8px; }
+  .brand-mark { width:31px; height:31px; border-radius:9px; background:#c6eb98; color:#173c2a; display:grid; place-items:center; flex:none; }
+  .sidebar-caption { padding:0 8px; margin:43px 0 13px; font-size:10px; letter-spacing:1.7px; color:#7d9b8c; text-transform:uppercase; }
+  .side-nav { display:grid; gap:5px; }
+  .side-nav a { display:flex; align-items:center; gap:12px; padding:12px; border-radius:8px; color:#afc2b7; text-decoration:none; font-size:12px; transition:background .15s,color .15s; }
+  .side-nav a:hover { background:#203b31; color:white; }
+  .side-nav a.active { background:#2a4435; color:#d4efa9; }
+  .side-nav svg { width:18px; height:18px; flex:none; }
+  .sidebar-bottom { margin-top:auto; padding:20px 10px 0; border-top:1px solid #2c4136; font-size:11px; line-height:1.8; color:#8ba495; }
+  .sidebar-bottom strong { color:#c2d9ca; font-size:12px; font-weight:500; }
+  .sidebar-bottom .small-dot { display:inline-block; width:6px; height:6px; background:#c6eb98; border-radius:50%; margin-right:7px; }
+  .wrap { max-width:1760px; margin-left:224px; padding:0 36px 36px; }
+  header { margin:0 -36px 0; padding:20px 36px; min-height:80px; gap:12px; }
+  header .brand { display:none; }
+  .header-title { color:var(--text-dim); font-size:12px; display:flex; gap:10px; align-items:center; }
+  .header-title span { color:var(--text-mute); }
+  header .status { order:4; width:100%; font-size:10px; }
+  .ctrl { gap:8px; }
+  #now,#addBtn,#hAdd,#fhSave { background:var(--accent); border-color:var(--accent); color:var(--bg); font-weight:600; }
+  .intro { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:34px 0 28px; }
+  .eyebrow { color:var(--accent); font-size:10px; font-weight:650; text-transform:uppercase; letter-spacing:1.7px; margin-bottom:10px; }
+  .intro h1 { margin:0; font-size:34px; font-weight:600; letter-spacing:-1.3px; line-height:1.2; }
+  .intro p { color:var(--text-dim); margin:10px 0 0; font-size:13px; }
+  .date-block { text-align:right; color:var(--text-dim); font-size:12px; white-space:nowrap; }
+  .date-block span { display:block; color:var(--text-mute); font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  section { margin-bottom:24px; scroll-margin-top:12px; }
+  .sec-head { gap:10px; margin-bottom:17px; align-items:center; }
+  .sec-head h2 { color:var(--text); font-size:15px; font-weight:600; letter-spacing:-.25px; text-transform:none; }
+  .sec-note { font-size:11px; }
+  .badge { border-radius:5px; font-size:8px; padding:4px 7px; }
+  .grid,.regime,.breadth { gap:14px; }
+  .card,.rg,.bd,.sp,.assess,.curve-box { border-radius:12px; box-shadow:var(--shadow); }
+  .card { padding:19px; }
+  .lbl { font-size:12px; margin-bottom:12px; }
+  .lbl .tick { font-size:9px; }
+  .val { font-family:var(--sans); font-size:25px; font-weight:600; letter-spacing:-.9px; }
+  .chg { font-size:10px; margin-top:7px; }
+  #pulse { grid-template-columns:repeat(4,minmax(0,1fr)) !important; }
+  #pulse .card:nth-child(-n+4) { border-top:3px solid var(--accent); }
+  .pulse-more { display:flex; justify-content:center; margin-top:12px; }
+  .pulse-more button { background:transparent; color:var(--text-dim); font-size:11px; padding:5px 15px; }
+  #pulse.compact .card:nth-child(n+5) { display:none; }
+  section[data-sec="assessment"],section[data-sec="indicators"],section[data-sec="curve"],section[data-sec="sectors"],section[data-sec="equities"] { background:var(--panel); border:1px solid var(--line-soft); border-radius:14px; padding:23px; }
+  .assess { border:0; box-shadow:none; padding:4px 0 0; }
+  .as-top { padding:18px; border-radius:10px; background:var(--panel-2); gap:25px; }
+  .as-num { font-family:var(--sans); font-size:56px; font-weight:550; letter-spacing:-3px; }
+  .as-label { font-size:20px; letter-spacing:-.5px; }
+  .as-gist { line-height:1.65; }
+  .as-p { padding:14px; border:1px solid var(--line-soft); border-radius:9px; }
+  .as-pk { font-size:9px; }
+  .as-pv { font-family:var(--sans); font-size:25px; }
+  .rg { padding:20px; border-left-width:1px; border-top-width:3px; }
+  .rg.good { border-left-color:var(--line-soft); border-top-color:var(--up); }
+  .rg.bad { border-left-color:var(--line-soft); border-top-color:var(--down); }
+  .rg.warn { border-left-color:var(--line-soft); border-top-color:var(--warn); }
+  .rg.neut { border-left-color:var(--line-soft); border-top-color:var(--flat); }
+  .rg .v { font-size:23px; margin:12px 0 6px; }
+  .eg { margin-bottom:24px; }
+  .eg:last-child { margin-bottom:0; }
+  .eg-h { font-size:10px; margin-bottom:12px; padding-bottom:10px; }
+  .eg-grid { gap:10px; }
+  .eg .card { background:var(--panel-2); border:0; padding:15px; box-shadow:none; }
+  .eg .val { font-size:23px; }
+  .curve-box { border:0; padding:18px 0; box-shadow:none; }
+  .sp { background:var(--panel-2); border:0; padding:17px; }
+  .bd { padding:21px; }
+  .bd .v { font-family:var(--sans); font-size:32px; margin:18px 0 6px; }
+  .heat { grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+  .ht { padding:16px 12px; border-radius:9px; }
+  .ht .p { font-size:23px; font-family:var(--sans); margin-top:16px; }
+  .seg { background:var(--panel-2); border:0; padding:3px; border-radius:8px; }
+  .seg button { min-height:28px; border-radius:6px; }
+  .seg button.on { background:var(--panel); color:var(--accent); box-shadow:0 1px 4px #00000012; }
+  .tabs button { font-size:15px; text-transform:none; letter-spacing:-.2px; padding:8px 0; }
+  table { font-size:12px; }
+  thead th { padding:13px 11px; background:var(--panel-2); font-size:9px; }
+  tbody td { padding:16px 11px; }
+  .sym { color:var(--accent); }
+  .co { margin-top:4px; }
+  .msg { padding:28px 16px; text-align:center; line-height:1.7; }
+  #errBox:not(:empty) { margin-bottom:20px; }
+  footer { font-size:10px; line-height:1.8; }
+  .skip-link { position:fixed; top:-60px; left:240px; z-index:100; background:var(--panel); color:var(--text); padding:12px; }
+  .skip-link:focus { top:10px; }
+  @media(min-width:1700px) { .wrap { margin-right:auto; } }
+  @media(max-width:1200px) { .sidebar{width:190px;padding:30px 12px} .wrap{margin-left:190px;padding:0 24px 30px} header{margin:0 -24px;padding:16px 24px} .header-title{display:none} .heat{grid-template-columns:repeat(4,minmax(0,1fr))} .sec-note{line-height:1.6} }
+  @media(max-width:900px) { .sidebar{width:72px;padding:25px 10px} .side-brand{padding:0;justify-content:center} .side-brand>span:last-child,.sidebar-caption,.side-nav a span,.sidebar-bottom{display:none} .side-nav{margin-top:35px} .side-nav a{justify-content:center;padding:14px 0} .wrap{margin-left:72px} .intro h1{font-size:29px} .date-block{display:none} #pulse{grid-template-columns:repeat(2,minmax(0,1fr)) !important} .sec-note{width:100%;padding-left:23px} }
+  @media(max-width:600px) { html{scroll-padding-top:155px} .sidebar{position:sticky;top:0;width:100%;height:57px;padding:9px 15px;flex-direction:row;align-items:center;justify-content:space-between} .side-brand .brand-mark{width:28px;height:28px} .side-nav{display:flex;margin:0;gap:8px} .side-nav a{padding:9px} .side-nav a:nth-child(n+5){display:none} .wrap{margin:0;padding:0 16px 24px} header{position:relative;margin:0 -16px;padding:14px 16px;gap:10px} .ctrl{flex-wrap:wrap;gap:6px} .ctrl label{font-size:10px} header>.spacer{display:none} header .status{font-size:9px;overflow-wrap:anywhere} .chip-mkt{font-size:9px} .intro{padding:26px 0 24px} .intro h1{font-size:28px} .intro p{font-size:12px;max-width:260px} section[data-sec]{padding:17px} section[data-sec="pulse"],section[data-sec="regime"],section[data-sec="breadth"]{padding:0} .card{padding:15px} .val{font-size:23px} .heat{grid-template-columns:repeat(2,minmax(0,1fr))} .as-head{min-width:0;width:100%;flex-basis:100%} .as-top{padding:15px} .as-cols{grid-template-columns:minmax(0,1fr)} .eg-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .eg .lbl{flex-wrap:wrap;gap:3px} .eg .card{padding:12px} .breadth{grid-template-columns:minmax(0,1fr)} .sec-head{gap:8px} .sec-head h2{font-size:14px} .skip-link{left:12px} }
+  @media(prefers-reduced-motion:reduce) { html{scroll-behavior:auto} *,*::before,*::after{animation:none !important;transition:none !important} }
+
 </style>
 </head>
 <body>
+<a class="skip-link" href="#overview">Skip to dashboard</a><aside class="sidebar"><a class="side-brand" href="#overview"><span class="brand-mark"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16V11m7 5V5m7 11V8"/></svg></span><span>stockwatcher<span style="color:#c6eb98">.</span></span></a><div class="sidebar-caption">Workspace</div><nav class="side-nav" aria-label="Dashboard sections"><a href="#overview" class="active" aria-current="location"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Overview</span></a><a href="#assessment"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 5 3 8-10M16 4h5v5"/></svg><span>Macro outlook</span></a><a href="#indicators"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10m5 10V4m6 16v-7m5 7V7"/></svg><span>Economic indicators</span></a><a href="#curveSection"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17c6 0 6-11 12-11h6M3 21h18"/></svg><span>Treasury yields</span></a><a href="#sectorsSection"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/></svg><span>Sector rotation</span></a><a href="#equities"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M8 6V3h8v3M3 12h18"/></svg><span>Watchlist & holdings</span></a></nav><div class="sidebar-bottom"><strong><span class="small-dot"></span>Your market perspective</strong><br>Macro signals. Clearer decisions.<br>US markets · USD</div></aside>
 <div class="wrap">
 
 <header>
+  <div class="header-title">Workspace <span>/</span> <strong>Market overview</strong></div>
   <div class="brand">
     <h1>Stockwatcher</h1>
     <span class="sub">US Macro &amp; Equity Dashboard</span>
@@ -451,10 +564,22 @@
   </div>
 </header>
 
-<div id="errBox"></div>
+<main id="overview">
+<div class="intro"><div><div class="eyebrow">The bigger picture</div><h1>Market overview</h1><p>Your daily perspective on the economy and the markets.</p></div><div class="date-block"><span>Market dashboard</span><time id="todayDate"></time></div></div>
+<div id="errBox" role="status"></div>
+
+<!-- ============ MARKET PULSE ============ -->
+<section id="pulseSection" data-sec="pulse">
+  <div class="sec-head">
+    <h2>Market Pulse</h2>
+    <span class="sec-note">Indices, volatility, dollar, commodities, FX</span>
+  </div>
+  <div class="grid compact" id="pulse" style="grid-template-columns: repeat(auto-fit, minmax(168px,1fr));"></div>
+<div class="pulse-more"><button id="pulseToggle" aria-expanded="false" aria-controls="pulse">Explore all 16 markets ↓</button></div>
+</section>
 
 <!-- ============ ASSESSMENT ============ -->
-<section data-sec="assessment">
+<section id="assessment" data-sec="assessment">
   <div class="sec-head">
     <h2>Economic Assessment</h2>
     <span class="sec-note">A scored read of everything below — what the indicators add up to</span>
@@ -463,7 +588,7 @@
 </section>
 
 <!-- ============ REGIME ============ -->
-<section data-sec="regime">
+<section id="regimeSection" data-sec="regime">
   <div class="sec-head">
     <h2>Macro Regime</h2>
     <span class="sec-note">Derived signals — the conditions your equity positions are priced against</span>
@@ -472,7 +597,7 @@
 </section>
 
 <!-- ============ INDICATORS ============ -->
-<section data-sec="indicators">
+<section id="indicators" data-sec="indicators">
   <div class="sec-head">
     <h2>Economic Indicators</h2>
     <span class="badge" id="econBadge">latest release</span>
@@ -482,7 +607,7 @@
 </section>
 
 <!-- ============ YIELD CURVE ============ -->
-<section data-sec="curve">
+<section id="curveSection" data-sec="curve">
   <div class="sec-head">
     <h2>US Treasury Yield Curve</h2>
     <span class="badge rt">real-time</span>
@@ -493,17 +618,8 @@
   </div>
 </section>
 
-<!-- ============ MARKET PULSE ============ -->
-<section data-sec="pulse">
-  <div class="sec-head">
-    <h2>Market Pulse</h2>
-    <span class="sec-note">Indices, volatility, dollar, commodities, FX</span>
-  </div>
-  <div class="grid" id="pulse" style="grid-template-columns: repeat(auto-fit, minmax(168px,1fr));"></div>
-</section>
-
 <!-- ============ BREADTH ============ -->
-<section data-sec="breadth">
+<section id="breadthSection" data-sec="breadth">
   <div class="sec-head">
     <h2>Market Breadth</h2>
     <span class="badge delay" id="breadthBadge">15-min delayed</span>
@@ -513,7 +629,7 @@
 </section>
 
 <!-- ============ SECTORS ============ -->
-<section data-sec="sectors">
+<section id="sectorsSection" data-sec="sectors">
   <div class="sec-head">
     <h2>Sector Rotation</h2>
     <span class="badge delay">15-min delayed</span>
@@ -530,7 +646,7 @@
 </section>
 
 <!-- ============ EQUITIES: WATCHLIST / HOLDINGS ============ -->
-<section data-sec="equities">
+<section id="equities" data-sec="equities">
   <div class="sec-head">
     <div class="tabs" id="tabs" role="tablist">
       <button role="tab" data-tab="watchlist">Watchlist</button>
@@ -576,6 +692,7 @@
   </div>
 </section>
 
+</main>
 <footer>
   <b>Data</b> — TradingView public scanner (no API key). Treasury yields, VIX, DXY, gold, silver and FX stream in real time;
   US equities, ETFs and index futures are delayed ~15 minutes; economic indicators update on their official release schedule.
@@ -2620,7 +2737,35 @@ document.addEventListener("visibilitychange", () => {
   else { refresh(); schedule(); }
 });
 
+// Keep navigation and the market overview usable with or without a data connection.
+$("todayDate").textContent = new Date().toLocaleDateString("en-US", {weekday:"long", month:"short", day:"numeric", year:"numeric"});
+$("pulseToggle").addEventListener("click", () => {
+  const compact = $("pulse").classList.toggle("compact");
+  $("pulseToggle").setAttribute("aria-expanded", String(!compact));
+  $("pulseToggle").textContent = compact ? "Explore all 16 markets ↓" : "Show market highlights ↑";
+});
+const navLinks = [...document.querySelectorAll(".side-nav a")];
+for (const link of navLinks) link.addEventListener("click", () => {
+  const section = document.querySelector(link.getAttribute("href"));
+  if (section?.matches("section.collapsed")) setCollapsed(section, false);
+});
+const navObserver = new IntersectionObserver((entries) => {
+  const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+  if (!visible) return;
+  for (const link of navLinks) {
+    const active = (link.hash === "#overview" ? "overviewIntro" : link.hash.slice(1)) === visible.target.id;
+    link.classList.toggle("active", active);
+    if (active) link.setAttribute("aria-current", "location"); else link.removeAttribute("aria-current");
+  }
+}, {rootMargin:"-10% 0px -65% 0px"});
+for (const link of navLinks) navObserver.observe(document.querySelector(link.hash === "#overview" ? ".intro" : link.hash));
+document.querySelector(".intro").id = "overviewIntro";
+// The overview link points to the main landmark while its observer tracks the introduction.
+navLinks[0].addEventListener("click", () => { navLinks.forEach(l => { l.classList.toggle("active", l === navLinks[0]); if(l === navLinks[0]) l.setAttribute("aria-current","location"); else l.removeAttribute("aria-current"); }); });
+for (const [id,label] of Object.entries({addIn:"Watchlist ticker",hSym:"Holding ticker",hQty:"Number of shares",hAvg:"Average cost per share",hDate:"Purchase date",fhKey:"Finnhub API key"})) $(id).setAttribute("aria-label",label);
+document.addEventListener("keydown", (event) => { if(event.key === "Escape" && !$("cfg").hidden) { $("cfg").hidden = true; $("cfgBtn").setAttribute("aria-expanded","false"); $("cfgBtn").focus(); } });
 initCollapsibles();
+renderAll();
 applyTab();
 renderCfg();
 fhStart();
