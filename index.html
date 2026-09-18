@@ -553,6 +553,10 @@
   .cal-coverage { font-size:11px; color:var(--text-dim); background:var(--panel-2); border-radius:7px; padding:10px 12px; margin:16px 0 0; line-height:1.6; }
   .cal-coverage.incomplete { border-left:3px solid var(--warn); }
   .cal-sources { font-size:10px; color:var(--text-dim); line-height:1.8; margin:12px 0 0; }
+  .cal-stars { color:var(--warn); letter-spacing:1px; white-space:nowrap; font-size:10px; }
+  .cal-provider { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 16px; padding:12px; border:1px solid var(--line-soft); border-radius:8px; font-size:11px; line-height:1.7; }
+  .cal-provider p { flex:1 1 300px; margin:0; color:var(--text-dim); }
+  .cal-provider a { color:var(--accent); white-space:nowrap; }
   @media(max-width:1100px) { .cal-layout{grid-template-columns:minmax(0,1fr)} .cal-agenda{border-left:0;border-top:1px solid var(--line-soft);padding:18px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:20px} .cal-agenda h3.cal-upcoming-title{margin-top:0} }
   @media(max-width:600px) { .cal-day{min-height:60px;padding:6px 4px} .cal-preview{display:none} .cal-agenda{grid-template-columns:minmax(0,1fr)} .cal-toolbar{gap:12px} .cal-controls{gap:6px} .cal-legend{gap:10px} }
 </style>
@@ -625,6 +629,10 @@
     <span class="badge">US markets</span>
     <span class="sec-note">Economic releases, Fed meetings &amp; market holidays</span>
   </div>
+  <div class="cal-provider">
+    <p><strong class="cal-stars">★★★ US high impact</strong> · Investing.com snapshot, checked September 18, 2026. Published events for Sep–Dec are included; later dates are incomplete and may change. Not a live feed.</p>
+    <a id="calInvestingOpen" href="https://www.investing.com/economic-calendar/" target="_blank" rel="noopener noreferrer">Open live US ★★★ calendar ↗</a>
+  </div>
   <div class="cal-toolbar">
     <div class="cal-controls">
       <button id="calPrev" aria-label="Previous month">←</button>
@@ -637,6 +645,7 @@
       <span class="cal-field"><label for="calFilter">Show</label>
       <select id="calFilter">
         <option value="all">All events</option>
+        <option value="high">★★★ US high impact · Investing.com</option>
         <option value="economic">Economic releases</option>
         <option value="fed">Fed meetings</option>
         <option value="holiday">Holidays &amp; early closes</option>
@@ -665,7 +674,8 @@
     <a href="https://www.bls.gov/schedule/2026/" target="_blank" rel="noopener noreferrer">BLS</a> ·
     <a href="https://www.bea.gov/news/schedule" target="_blank" rel="noopener noreferrer">BEA</a> ·
     <a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noopener noreferrer">Federal Reserve</a> ·
-    <a href="https://www.nyse.com/trade/hours-calendars" target="_blank" rel="noopener noreferrer">NYSE</a>.
+    <a href="https://www.nyse.com/trade/hours-calendars" target="_blank" rel="noopener noreferrer">NYSE</a> ·
+    <a href="https://www.investing.com/economic-calendar/" target="_blank" rel="noopener noreferrer">Investing.com</a>.
     All-day events follow the New York market date. Timed events adjust for daylight saving automatically.
   </p>
 </section>
@@ -1057,10 +1067,125 @@ const CAL_SOURCES = {
   BLS: "https://www.bls.gov/schedule/2026/",
   BEA: "https://www.bea.gov/news/schedule",
   Fed: "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-  NYSE: "https://www.nyse.com/trade/hours-calendars"
+  NYSE: "https://www.nyse.com/trade/hours-calendars",
+  "Investing.com": "https://www.investing.com/economic-calendar/"
 };
 const CAL_TYPES = { economic: "Economic release", fed: "Fed meeting", holiday: "Market closed", early: "Early close" };
 const CAL_MARKET_YEARS = [2026, 2027];
+// Investing.com: US only, three filled stars, read 2026-09-18.
+// Requested Sep 1–Dec 31. Only published rows are included, not inferred recurrences.
+// The source displayed TRT; these dates/times are normalized to New York (ET).
+const CAL_INVESTING_SERIES = {
+  mfg: ["S&P Global Manufacturing PMI", "Manufacturing PMI", "manufacturing-pmi-829", ""],
+  ismprice: ["ISM Manufacturing Prices", "ISM prices", "ism-manufacturing-prices-174", ""],
+  ism: ["ISM Manufacturing PMI", "ISM manufacturing", "ism-manufacturing-pmi-173", ""],
+  jolts: ["JOLTS Job Openings", "JOLTS", "jolts-job-openings-1057", "JOLTS"],
+  adp: ["ADP Nonfarm Employment Change", "ADP employment", "adp-nonfarm-employment-change-1", ""],
+  oil: ["Crude Oil Inventories", "Oil inventories", "eia-crude-oil-inventories-75", ""],
+  claims: ["Initial Jobless Claims", "Jobless claims", "initial-jobless-claims-294", ""],
+  services: ["S&P Global Services PMI", "Services PMI", "services-pmi-1062", ""],
+  nonprice: ["ISM Non-Manufacturing Prices", "ISM services prices", "ism-non-manufacturing-prices-1049", ""],
+  non: ["ISM Non-Manufacturing PMI", "ISM services", "ism-non-manufacturing-pmi-176", ""],
+  wages: ["Average Hourly Earnings (MoM)", "Hourly earnings", "average-hourly-earnings-8", "Payrolls"],
+  nfp: ["Nonfarm Payrolls", "Payrolls", "nonfarm-payrolls-227", "Payrolls"],
+  unemployment: ["Unemployment Rate", "Unemployment", "unemployment-rate-300", "Payrolls"],
+  note: ["10-Year Note Auction", "10Y auction", "10-year-note-auction-571", ""],
+  speech: ["U.S. President Trump Speaks", "President speech", "u.s.-president-trump-speaks-1694", ""],
+  ppi: ["PPI (MoM)", "PPI", "ppi-238", "PPI"],
+  existing: ["Existing Home Sales", "Existing homes", "existing-home-sales-99", ""],
+  bond: ["30-Year Bond Auction", "30Y auction", "30-year-bond-auction-572", ""],
+  cpi: ["CPI (MoM)", "CPI monthly", "cpi-69", "CPI"],
+  cpiy: ["CPI (YoY)", "CPI yearly", "cpi-733", "CPI"],
+  corecpi: ["Core CPI (MoM)", "Core CPI", "core-cpi-56", "CPI"],
+  coreretail: ["Core Retail Sales (MoM)", "Core retail sales", "core-retail-sales-63", ""],
+  retail: ["Retail Sales (MoM)", "Retail sales", "retail-sales-256", ""],
+  rate: ["Fed Interest Rate Decision", "Fed decision", "interest-rate-decision-168", "Fed decision"],
+  projection: ["FOMC Economic Projections", "Fed projections", "fomc-economic-projections-1061", ""],
+  statement: ["FOMC Statement", "FOMC statement", "fomc-statement-398", ""],
+  press: ["FOMC Press Conference", "Fed press conference", "fomc-press-conference-1692", ""],
+  philly: ["Philadelphia Fed Manufacturing Index", "Philly Fed", "philadelphia-fed-manufacturing-index-236", ""],
+  newhome: ["New Home Sales", "New homes", "new-home-sales-222", ""],
+  durable: ["Durable Goods Orders (MoM)", "Durable goods", "durable-goods-orders-86", ""],
+  confidence: ["CB Consumer Confidence", "Consumer confidence", "cb-consumer-confidence-48", ""],
+  pcey: ["Core PCE Price Index (YoY)", "Core PCE yearly", "core-pce-price-index-905", "PCE"],
+  pce: ["Core PCE Price Index (MoM)", "Core PCE monthly", "core-pce-price-index-61", "PCE"],
+  gdp: ["GDP (QoQ)", "GDP", "gdp-375", "GDP"],
+  chicago: ["Chicago PMI", "Chicago PMI", "chicago-pmi-38", ""],
+};
+const CAL_INVESTING_EVENTS = [
+  ["2026-09-01", "09:45", "mfg", "Aug"],
+  ["2026-09-01", "10:00", "ismprice", "Aug"],
+  ["2026-09-01", "10:00", "ism", "Aug"],
+  ["2026-09-01", "10:00", "jolts", "Jul"],
+  ["2026-09-02", "08:15", "adp", "Aug"],
+  ["2026-09-02", "10:30", "oil", ""],
+  ["2026-09-03", "08:30", "claims", ""],
+  ["2026-09-03", "09:45", "services", "Aug"],
+  ["2026-09-03", "10:00", "nonprice", "Aug"],
+  ["2026-09-03", "10:00", "non", "Aug"],
+  ["2026-09-04", "08:30", "wages", "Aug"],
+  ["2026-09-04", "08:30", "nfp", "Aug"],
+  ["2026-09-04", "08:30", "unemployment", "Aug"],
+  ["2026-09-09", "13:00", "note", ""],
+  ["2026-09-09", "21:15", "speech", ""],
+  ["2026-09-10", "08:30", "ppi", "Aug"],
+  ["2026-09-10", "08:30", "claims", ""],
+  ["2026-09-10", "10:00", "existing", "Aug"],
+  ["2026-09-10", "12:00", "oil", ""],
+  ["2026-09-10", "13:01", "bond", ""],
+  ["2026-09-11", "08:30", "cpi", "Aug"],
+  ["2026-09-11", "08:30", "cpiy", "Aug"],
+  ["2026-09-11", "08:30", "corecpi", "Aug"],
+  ["2026-09-16", "08:30", "coreretail", "Aug"],
+  ["2026-09-16", "08:30", "retail", "Aug"],
+  ["2026-09-16", "10:30", "oil", ""],
+  ["2026-09-16", "14:00", "rate", ""],
+  ["2026-09-16", "14:00", "projection", ""],
+  ["2026-09-16", "14:00", "statement", ""],
+  ["2026-09-16", "14:30", "press", ""],
+  ["2026-09-17", "08:30", "philly", "Sep"],
+  ["2026-09-17", "08:30", "claims", ""],
+  ["2026-09-23", "09:45", "mfg", "Sep"],
+  ["2026-09-23", "09:45", "services", "Sep"],
+  ["2026-09-23", "10:30", "oil", ""],
+  ["2026-09-24", "08:30", "claims", ""],
+  ["2026-09-24", "10:00", "newhome", "Aug"],
+  ["2026-09-25", "08:30", "durable", "Aug"],
+  ["2026-09-29", "10:00", "confidence", "Sep"],
+  ["2026-09-29", "10:00", "jolts", "Aug"],
+  ["2026-09-30", "08:15", "adp", "Sep"],
+  ["2026-09-30", "08:30", "pcey", "Aug"],
+  ["2026-09-30", "08:30", "pce", "Aug"],
+  ["2026-09-30", "08:30", "gdp", "Q2"],
+  ["2026-09-30", "09:45", "chicago", "Sep"],
+  ["2026-10-01", "09:45", "mfg", "Sep"],
+  ["2026-10-01", "10:00", "ism", "Sep"],
+  ["2026-10-01", "10:00", "ismprice", "Sep"],
+  ["2026-10-02", "08:30", "nfp", "Sep"],
+  ["2026-10-02", "08:30", "unemployment", "Sep"],
+  ["2026-10-02", "08:30", "wages", "Sep"],
+  ["2026-10-05", "09:45", "services", "Sep"],
+  ["2026-10-05", "10:00", "nonprice", "Sep"],
+  ["2026-10-05", "10:00", "non", "Sep"],
+  ["2026-10-28", "14:00", "rate", ""],
+  ["2026-12-09", "14:00", "rate", ""],
+].map(([date, time, key, period]) => {
+  const [name, short, slug, replaces] = CAL_INVESTING_SERIES[key];
+  return { date, time, title: name + (period ? ` (${period})` : ""), short,
+    type: ["rate", "projection", "statement", "press"].includes(key) ? "fed" : "economic",
+    source: "Investing.com", country: "US", importance: 3, replaces,
+    url: `${CAL_SOURCES["Investing.com"]}${slug}`,
+    note: "" };
+});
+// A publisher's bundled release (e.g. payrolls, wages, unemployment) is replaced
+// by its individual Investing.com indicators only for the dates actually observed.
+function calMergeInvesting(base, incoming) {
+  const retained = base.filter(event => !incoming.some(row => row.replaces && row.date === event.date && row.replaces === event.short && row.time === event.time));
+  return retained.concat(incoming.map(row => {
+    const original = base.find(event => row.replaces && row.date === event.date && row.replaces === event.short && row.time === event.time);
+    return original ? { ...row, officialSource: original.source, note: [row.note, original.note].filter(Boolean).join(" ") } : row;
+  }));
+}
 const CAL_EVENTS = (() => {
   const events = [];
   const add = (date, title, short, type, source, time = null, note = "") =>
@@ -1113,7 +1238,7 @@ const CAL_EVENTS = (() => {
     add(`2026-${md}`, `GDP · ${estimate}`, "GDP", "economic", "BEA", "08:30", "US gross domestic product.");
     add(`2026-${md}`, "PCE inflation & personal income", "PCE", "economic", "BEA", "08:30", "Personal Income and Outlays; includes headline and core PCE price indexes.");
   }
-  return events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || "") || a.title.localeCompare(b.title));
+  return calMergeInvesting(events, CAL_INVESTING_EVENTS).sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || "") || a.title.localeCompare(b.title));
 })();
 
 // Date-only arithmetic stays in UTC; it must not depend on the browser's zone.
@@ -1128,7 +1253,7 @@ function calDateInZone(now, zone) {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 // Convert a scheduled ET wall-clock time using the zone's offset on that date.
-// All supported events are daytime, away from ambiguous DST transition hours.
+// Verified event times are away from ambiguous DST transition hours.
 function calInstant(event) {
   const wall = new Date(`${event.date}T${event.time || "00:00"}:00Z`);
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).formatToParts(wall);
@@ -1147,7 +1272,7 @@ function calDateLabel(date, options = { weekday: "long", month: "short", day: "n
   return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
 }
 function calMatches(event, filter) {
-  return filter === "all" || event.type === filter || (filter === "holiday" && event.type === "early");
+  return filter === "all" || (filter === "high" && event.country === "US" && event.importance === 3) || event.type === filter || (filter === "holiday" && event.type === "early");
 }
 function calUpcomingEvents(now, zone, filter) {
   const marketToday = calDateInZone(now, "America/New_York");
@@ -1159,7 +1284,7 @@ function calCoverage(month) {
   if (!CAL_MARKET_YEARS.includes(year)) return "No verified schedule loaded for this year. Empty dates do not imply no events or an open market. Check the official calendars below.";
   if (year === 2027) return "Partial coverage: 2027 NYSE holidays, early closes and tentative Fed meetings. Economic release dates are not loaded for 2027.";
   if (month < "2026-09") return "Coverage: 2026 CPI, payrolls, PPI, JOLTS, Fed meetings and NYSE holidays. GDP and PCE dates are loaded for September–December only. Other releases are not included.";
-  return "Coverage: CPI, payrolls, PPI, JOLTS, GDP, PCE, Fed meetings and NYSE holidays. Selected releases only; this is not a complete economic calendar.";
+  return "Coverage: CPI, payrolls, PPI, JOLTS, GDP, PCE, Fed meetings and NYSE holidays. Also includes published Investing.com three-star US events checked September 18, 2026. Later dates are incomplete; this snapshot does not update automatically.";
 }
 
 const calendar = {
@@ -1171,13 +1296,23 @@ calendar.today = calDateInZone(new Date(), calendar.zone);
 calendar.selected = calendar.today;
 calendar.month = calendar.today.slice(0, 7);
 
+function calInvestingURL(zone) {
+  const params = new URLSearchParams({
+    columns: "exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous",
+    features: "datepicker,timeselector",
+    countries: "5", importance: "3", calType: "week",
+    timeZone: zone === "Europe/Istanbul" ? "63" : "8", lang: "1"
+  });
+  return `https://sslecal2.investing.com/?${params}`;
+}
+
 function calEventHTML(event, upcoming = false) {
   const date = calDisplayDate(event, calendar.zone);
   return `<article class="cal-event">
     ${upcoming ? `<button class="cal-jump" data-cal-date="${date}" aria-label="View ${esc(calDateLabel(date))}">${esc(calDateLabel(date, { month: "short", day: "numeric", year: "numeric" }))} ↗</button>` : ""}
-    <div class="cal-event-title"><i class="cal-dot ${event.type}" aria-hidden="true"></i><span>${esc(event.title)}</span></div>
-    <div class="cal-event-meta">${esc(calTime(event, calendar.zone))} · ${CAL_TYPES[event.type]} · <a href="${CAL_SOURCES[event.source]}" target="_blank" rel="noopener noreferrer">${event.source}</a></div>
-    ${!upcoming ? `<div class="cal-event-meta">${esc(event.note)}</div>` : ""}
+    <div class="cal-event-title"><i class="cal-dot ${event.type}" aria-hidden="true"></i><span>${esc(event.title)}${event.importance === 3 ? ' <span class="cal-stars" aria-label="High importance: three stars">★★★</span>' : ""}</span></div>
+    <div class="cal-event-meta">${esc(calTime(event, calendar.zone))} · ${CAL_TYPES[event.type]} · <a href="${esc(event.url || CAL_SOURCES[event.source])}" target="_blank" rel="noopener noreferrer">${event.source}</a>${event.officialSource ? ` · <a href="${CAL_SOURCES[event.officialSource]}" target="_blank" rel="noopener noreferrer">${event.officialSource}</a>` : ""}</div>
+    ${!upcoming && event.note ? `<div class="cal-event-meta">${esc(event.note)}</div>` : ""}
   </article>`;
 }
 function renderCalendar() {
@@ -1186,6 +1321,7 @@ function renderCalendar() {
   calendar.today = calDateInZone(now, calendar.zone);
   $("calMonth").value = calendar.month;
   $("calZone").value = calendar.zone;
+  $("calInvestingOpen").href = calInvestingURL(calendar.zone);
   $("calFilter").value = calendar.filter;
   $("calPrev").disabled = calendar.month <= "1900-01";
   $("calNext").disabled = calendar.month >= "2100-12";
@@ -1203,7 +1339,7 @@ function renderCalendar() {
     const events = byDate.get(date) || [];
     const outside = !date.startsWith(calendar.month);
     const today = date === calendar.today;
-    const summary = events.length ? events.map(e => `${e.title}, ${CAL_TYPES[e.type]}`).join("; ") : "No listed events";
+    const summary = events.length ? events.map(e => `${e.title}${e.importance === 3 ? ", three-star high importance" : ""}, ${CAL_TYPES[e.type]}`).join("; ") : "No listed events";
     return `<button class="cal-day${outside ? " outside" : ""}${index % 7 >= 5 ? " weekend" : ""}${today ? " today" : ""}"
       data-cal-date="${date}" aria-pressed="${date === calendar.selected}" ${today ? 'aria-current="date"' : ""}
       tabindex="${date === calendar.selected ? "0" : "-1"}" aria-label="${esc(calDateLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) + ". " + summary)}">
@@ -1221,7 +1357,7 @@ function renderCalendar() {
   calendar.upcomingKey = upcoming.map(e => e.date + e.title).join("|");
   $("calUpcoming").innerHTML = upcoming.length ? upcoming.map(e => calEventHTML(e, true)).join("")
     : '<div class="cal-empty">No upcoming events in the loaded schedule for this filter. Check the official sources for newer dates.</div>';
-  $("calCoverage").textContent = calCoverage(calendar.month);
+  $("calCoverage").textContent = calCoverage(calendar.month) + (calendar.filter === "high" ? " Three-star filter: Investing.com US snapshot checked September 18, 2026; published Sep–Dec events only. Empty dates may have unpublished or newly added events." : "");
   $("calCoverage").classList.toggle("incomplete", !calendar.month.startsWith("2026") || calendar.month < "2026-09");
   if (focusDate) $("calGrid").querySelector(`[data-cal-date="${calendar.selected}"]`)?.focus({ preventScroll: true });
 }
