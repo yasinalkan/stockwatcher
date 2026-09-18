@@ -819,7 +819,7 @@ const ENDPOINT = "https://scanner.tradingview.com/global/scan";
 
 const COLS = [
   "close", "change", "change_abs", "volume", "description", "update_mode",
-  "market_cap_basic", "price_earnings_ttm", "sector",
+  "market_cap_basic", "price_earnings_ttm", "price_earnings_growth_ttm", "sector",
   "Perf.W", "Perf.1M", "Perf.3M", "Perf.YTD", "Perf.Y",
   "RSI", "price_52_week_high", "price_52_week_low", "beta_1_year",
   "dividend_yield_recent", "relative_volume_10d_calc"
@@ -2586,6 +2586,7 @@ const WL_COLS = [
   { k: "RSI",                n: "RSI" },
   { k: "range",              n: "52w Range" },
   { k: "price_earnings_ttm", n: "P/E" },
+  { k: "price_earnings_growth_ttm", n: "PEG", tip: "Price/earnings-to-growth ratio (TTM), supplied by TradingView. — means unavailable." },
   { k: "beta_1_year",        n: "Beta" },
   { k: "dividend_yield_recent", n: "Div %" },
   { k: "market_cap_basic",   n: "Mkt Cap" },
@@ -2599,7 +2600,7 @@ function renderWatchlist() {
   $("wlHead").innerHTML = WL_COLS.map((c) => {
     const on = state.sort.col === c.k;
     const ar = on ? `<span class="ar">${state.sort.dir < 0 ? "▼" : "▲"}</span>` : "";
-    return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}">${esc(c.n)} ${ar}</th>`;
+    return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}"${c.tip ? ` title="${esc(c.tip)}"` : ""}>${esc(c.n)} ${ar}</th>`;
   }).join("");
 
   // Rows carry the live price merged in, so sorting and the 52-week marker
@@ -2655,6 +2656,7 @@ function renderWatchlist() {
           ${pos === null ? "—" : `<span class="rng"><i style="left:${(pos * 100).toFixed(1)}%"></i></span>`}
         </td>
         <td>${isNum(r.price_earnings_ttm) ? esc(num(r.price_earnings_ttm, 1)) : "—"}</td>
+        <td>${esc(num(r.price_earnings_growth_ttm, 2))}</td>
         <td>${isNum(r.beta_1_year) ? esc(num(r.beta_1_year, 2)) : "—"}</td>
         <td>${isNum(r.dividend_yield_recent) ? esc(num(r.dividend_yield_recent, 2)) : "—"}</td>
         <td>${isNum(r.market_cap_basic) ? "$" + esc(compact(r.market_cap_basic)) : "—"}</td>
@@ -2686,6 +2688,7 @@ const H_COLS = [
   { k: "dayPl",  n: "Day P&L" },
   { k: "weight", n: "Weight" },
   { k: "held",   n: "Held" },
+  { k: "price_earnings_growth_ttm", n: "PEG", tip: "Price/earnings-to-growth ratio (TTM), supplied by TradingView. — means unavailable." },
   { k: "sector", n: "Sector", l: true },
   { k: "_x",     n: "" }
 ];
@@ -2733,6 +2736,7 @@ function computePortfolio() {
       ticker: r?.ticker ?? h.symbol.split(":")[1],
       description: r?.description ?? "",
       sector: r?.sector ?? "",
+      price_earnings_growth_ttm: r?.price_earnings_growth_ttm ?? null,
       qty: h.qty, avg: h.avg, date: h.date || "",
       price, cost, value, pl,
       plpct: isNum(pl) && cost > 0 ? (pl / cost) * 100 : null,
@@ -2790,7 +2794,7 @@ function renderHoldings() {
   $("hHead").innerHTML = H_COLS.map((c) => {
     const on = state.holdSort.col === c.k;
     const ar = on ? `<span class="ar">${state.holdSort.dir < 0 ? "▼" : "▲"}</span>` : "";
-    return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}">${esc(c.n)} ${ar}</th>`;
+    return `<th class="${c.l ? "l" : ""}" data-col="${esc(c.k)}"${c.tip ? ` title="${esc(c.tip)}"` : ""}>${esc(c.n)} ${ar}</th>`;
   }).join("");
 
   // ---- body ----
@@ -2828,6 +2832,7 @@ function renderHoldings() {
       <td class="${dirClass(r.dayPl)}">${esc(signedMoney(r.dayPl))}</td>
       <td>${isNum(r.weight) ? esc(num(r.weight, 1)) + "%" : "—"}</td>
       <td><span class="pill" title="${esc(r.date || "no date given")}">${esc(r.held || "—")}</span></td>
+      <td>${esc(num(r.price_earnings_growth_ttm, 2))}</td>
       <td class="l"><span class="sect">${esc(r.sector || "—")}</span></td>
       <td><button class="x" data-hdel="${esc(r.symbol)}" title="Remove">×</button></td>
     </tr>`).join("");
@@ -2841,7 +2846,7 @@ function renderHoldings() {
       <td class="${dirClass(totals.pl)}">${esc(signedMoney(totals.pl))}</td>
       <td class="${dirClass(totals.plpct)}">${esc(pct(totals.plpct))}</td>
       <td class="${dirClass(totals.dayPl)}">${esc(signedMoney(totals.dayPl))}</td>
-      <td>100%</td><td></td><td></td><td></td>
+      <td>100%</td><td></td><td></td><td></td><td></td>
     </tr>`;
 
   for (const tr of body.children) {
