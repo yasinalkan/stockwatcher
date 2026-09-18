@@ -1,0 +1,118 @@
+// Run with: node --test tests/calendar.test.cjs
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const script = html.slice(html.indexOf('/* ---------- market calendar: verified'), html.indexOf('/** Attach a directional flash'));
+const context = vm.createContext({ Intl, Date, load: (_, fallback) => fallback });
+vm.runInContext(script + '\nthis.api = { CAL_EVENTS, calShiftDate, calInstant, calTime, calDisplayDate, calDateInZone, calMatches, calUpcomingEvents, calCoverage, marketStatus };', context);
+const api = context.api;
+const at = (iso) => api.marketStatus(new Date(iso));
+
+// Historical regressions are deliberate: these releases did not follow the
+// usual first-Friday / once-per-month patterns in the publisher's schedule.
+test('dataset retains rescheduled releases and multiple events on one date', () => {
+  assert(api.CAL_EVENTS.some(e => e.date === '2026-02-11' && e.short === 'Payrolls'));
+  assert.equal(api.CAL_EVENTS.filter(e => e.date.startsWith('2026-01') && e.short === 'PPI').length, 2);
+  assert.equal(api.CAL_EVENTS.filter(e => e.date === '2026-04-03').length, 2);
+  assert.equal(api.CAL_EVENTS.filter(e => e.date === '2026-09-30').length, 2);
+});
+
+test('schedule rows are valid, uniquely identified and chronologically ordered', () => {
+  const ids = new Set();
+  let previous = '';
+  for (const event of api.CAL_EVENTS) {
+    assert.match(event.date, /^202[67]-\d{2}-\d{2}$/);
+    assert.equal(new Date(event.date).toISOString().slice(0, 10), event.date);
+    assert(event.date >= previous);
+    previous = event.date;
+    const id = event.date + event.title;
+    assert(!ids.has(id), id);
+    ids.add(id);
+    assert(['economic', 'fed', 'holiday', 'early'].includes(event.type));
+    assert(['BLS', 'BEA', 'Fed', 'NYSE'].includes(event.source));
+  }
+  assert.equal(api.CAL_EVENTS.filter(e => e.type === 'holiday').length, 20);
+  assert.equal(api.CAL_EVENTS.filter(e => e.type === 'early').length, 3);
+});
+
+test('New York summer and winter releases convert to correct Türkiye time', () => {
+  const summer = { date: '2026-09-11', time: '08:30' };
+  const winter = { date: '2026-11-10', time: '08:30' };
+  assert.equal(api.calInstant(summer).toISOString(), '2026-09-11T12:30:00.000Z');
+  assert.equal(api.calInstant(winter).toISOString(), '2026-11-10T13:30:00.000Z');
+  assert.equal(api.calTime(summer, 'Europe/Istanbul'), '15:30 TRT');
+  assert.equal(api.calTime(winter, 'Europe/Istanbul'), '16:30 TRT');
+  assert.equal(api.calTime(summer, 'America/New_York'), '08:30 ET');
+});
+
+test('DST changes use the release date, not today’s offset', () => {
+  for (const [date, expected] of [['2026-03-06', '16:30 TRT'], ['2026-03-09', '15:30 TRT'], ['2026-10-30', '15:30 TRT'], ['2026-11-02', '16:30 TRT']]) {
+    assert.equal(api.calTime({ date, time: '08:30' }, 'Europe/Istanbul'), expected);
+  }
+});
+
+test('all-day holidays stay on their market date across time zones', () => {
+  const holiday = api.CAL_EVENTS.find(e => e.date === '2026-12-25');
+  assert.equal(api.calDisplayDate(holiday, 'Europe/Istanbul'), '2026-12-25');
+  assert.equal(api.calTime(holiday, 'Europe/Istanbul'), 'All day · ET date');
+  assert.equal(api.calDateInZone(new Date('2026-12-25T02:00:00Z'), 'America/New_York'), '2026-12-24');
+});
+
+test('date arithmetic crosses months, leap days and years correctly', () => {
+  assert.equal(api.calShiftDate('2026-12-31', 1), '2027-01-01');
+  assert.equal(api.calShiftDate('2026-03-01', -1), '2026-02-28');
+  assert.equal(api.calShiftDate('2028-03-01', -1), '2028-02-29');
+});
+
+test('holiday filter includes early closes but excludes economic releases', () => {
+  assert(api.calMatches({ type: 'early' }, 'holiday'));
+  assert(api.calMatches({ type: 'holiday' }, 'holiday'));
+  assert(!api.calMatches({ type: 'economic' }, 'holiday'));
+});
+
+test('upcoming events exclude elapsed timed releases and respect filters', () => {
+  const upcoming = api.calUpcomingEvents(new Date('2026-09-30T12:31:00Z'), 'Europe/Istanbul', 'economic');
+  assert.equal(upcoming[0].date, '2026-10-02');
+  assert(upcoming.every(e => e.type === 'economic'));
+  assert.equal(api.calUpcomingEvents(new Date('2028-01-01T00:00:00Z'), 'America/New_York', 'all').length, 0);
+});
+
+test('upcoming all-day holidays use the New York day at the Türkiye midnight boundary', () => {
+  const upcoming = api.calUpcomingEvents(new Date('2026-12-26T00:30:00+03:00'), 'Europe/Istanbul', 'holiday');
+  assert.equal(upcoming[0].date, '2026-12-25');
+});
+
+test('holidays and observed holidays override ordinary weekday session hours', () => {
+  assert.equal(at('2026-07-03T15:00:00Z').open, false);
+  assert.match(at('2026-07-03T15:00:00Z').txt, /Independence Day/);
+  assert.equal(at('2027-12-24T15:00:00Z').open, false);
+  assert.match(at('2026-11-26T15:00:00Z').txt, /Thanksgiving/);
+});
+
+test('early close switches precisely at 13:00 ET; July 2 2026 is a full session', () => {
+  assert.equal(at('2026-11-27T17:59:00Z').open, true);
+  assert.equal(at('2026-11-27T18:00:00Z').open, false);
+  assert.match(at('2026-11-27T18:00:00Z').txt, /early close/);
+  assert.equal(at('2026-12-24T17:59:00Z').open, true);
+  assert.equal(at('2026-12-24T18:00:00Z').open, false);
+  assert.equal(at('2026-07-02T18:00:00Z').open, true);
+});
+
+test('regular sessions, pre-market, after-hours and weekends remain correct', () => {
+  assert.equal(at('2026-09-18T13:29:00Z').txt, 'Pre-market');
+  assert.equal(at('2026-09-18T13:30:00Z').open, true);
+  assert.equal(at('2026-09-18T20:00:00Z').txt, 'After hours');
+  assert.equal(at('2026-09-19T15:00:00Z').txt, 'Weekend');
+  assert.equal(at('2026-09-18T05:00:00Z').txt, 'Closed');
+});
+
+test('coverage gaps do not claim a complete calendar or a verified market session', () => {
+  assert.match(api.calCoverage('2027-01'), /Economic release dates are not loaded/);
+  assert.match(api.calCoverage('2028-01'), /No verified schedule/);
+  assert.match(api.calCoverage('2026-05'), /September–December only/);
+  assert.equal(at('2028-01-03T15:00:00Z').txt, 'Session unverified');
+});
